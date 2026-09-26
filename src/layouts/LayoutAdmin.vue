@@ -1,16 +1,23 @@
 <script setup>
 import { RouterView } from 'vue-router'
+import SidebarAdmin from '../components/common/SidebarAdmin.vue'
+import BarraInferiorAdmin from '../components/common/BarraInferiorAdmin.vue'
 </script>
 
 <template>
   <div class="layout-admin">
-    <!-- Contenedor del área de trabajo administrativo -->
+    <!-- Barra Lateral para Escritorio -->
+    <SidebarAdmin />
+
+    <!-- Área de Trabajo Principal -->
     <div class="area-trabajo">
-      <!-- El contenido de la vista administrativa (Dashboard, Inventario, etc.) -->
       <main class="contenido-admin">
         <RouterView />
       </main>
     </div>
+
+    <!-- Barra de Navegación Inferior para Móvil -->
+    <BarraInferiorAdmin />
   </div>
 </template>
 
@@ -50,7 +57,7 @@ import { RouterView } from 'vue-router'
   .layout-admin {
     padding-left: 240px;
   }
-  
+
   .contenido-admin {
     padding: 24px;
   }
