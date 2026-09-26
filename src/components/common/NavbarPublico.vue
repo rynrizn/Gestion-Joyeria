@@ -15,23 +15,13 @@ defineEmits(['abrir-carrito'])
 <template>
   <header class="barra-publica">
     <div class="contenedor contenido-barra">
-      <!-- Marca / Nombre en texto plano neutro -->
+      <!-- Marca / Nombre con estética Figma Moonstone -->
       <RouterLink to="/" class="enlace-marca">
-        <h2 class="nombre-marca">Moonstone Joyería</h2>
+        <h2 class="nombre-marca">MOONSTONE</h2>
       </RouterLink>
 
-      <!-- Acciones a la derecha -->
+      <!-- Acciones a la derecha: Solo Carrito de Compras -->
       <div class="acciones-derecha">
-        <!-- Enlace discreto para acceso de vendedoras / dueña -->
-        <RouterLink
-          to="/login"
-          class="boton-acceso-admin"
-          title="Acceso al sistema de gestión"
-        >
-          <IconoLucide nombre="User" :tamano="18" />
-          <span class="texto-acceso">Gestión</span>
-        </RouterLink>
-
         <!-- Botón de Carrito con Contador Numérico Flotante -->
         <button
           type="button"
@@ -71,42 +61,20 @@ defineEmits(['abrir-carrito'])
 .enlace-marca {
   display: inline-flex;
   align-items: center;
+  text-decoration: none;
 }
 
 .nombre-marca {
-  font-size: var(--tamano-h2);
-  font-weight: 700;
-  color: var(--color-neutral-900);
-  letter-spacing: -0.02em;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--color-primario);
+  letter-spacing: 0.12em;
 }
 
 .acciones-derecha {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.boton-acceso-admin {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radio-md);
-  font-size: var(--tamano-caption);
-  color: var(--color-neutral-600);
-  font-weight: 500;
-  transition: all var(--transicion-rapida);
-}
-
-.boton-acceso-admin:hover {
-  background-color: var(--color-neutral-50);
-  color: var(--color-neutral-900);
-}
-
-@media (max-width: 640px) {
-  .texto-acceso {
-    display: none;
-  }
 }
 
 .boton-bolsa-carrito {
@@ -118,11 +86,12 @@ defineEmits(['abrir-carrito'])
   height: 42px;
   border-radius: var(--radio-md);
   color: var(--color-neutral-900);
-  transition: background-color var(--transicion-rapida);
+  transition: all var(--transicion-rapida);
 }
 
 .boton-bolsa-carrito:hover {
-  background-color: var(--color-neutral-50);
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
 }
 
 .contador-flotante {
@@ -133,7 +102,7 @@ defineEmits(['abrir-carrito'])
   height: 18px;
   padding: 0 4px;
   border-radius: var(--radio-completo);
-  background-color: var(--color-neutral-900);
+  background-color: var(--color-primario);
   color: var(--color-blanco);
   font-size: 10px;
   font-weight: 700;

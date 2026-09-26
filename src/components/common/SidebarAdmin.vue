@@ -22,10 +22,10 @@ const cerrarSesion = () => {
 
 <template>
   <aside class="sidebar-admin">
-    <!-- Logotipo y Marca -->
+    <!-- Logotipo y Marca Oficial Moonstone -->
     <div class="cabecera-sidebar">
       <div class="marca">
-        <h2 class="titulo-marca">Moonstone</h2>
+        <h2 class="titulo-marca">MOONSTONE</h2>
         <span class="subtitulo-marca">Panel de Gestión</span>
       </div>
     </div>
@@ -42,7 +42,7 @@ const cerrarSesion = () => {
       </ul>
     </nav>
 
-    <!-- Pie del Sidebar: Vendedora y Acciones -->
+    <!-- Pie del Sidebar: Rol de Usuario y Acciones -->
     <div class="pie-sidebar">
       <!-- Enlace para ver catálogo como cliente -->
       <RouterLink to="/" class="enlace-tienda" target="_blank" title="Abrir catálogo público">
@@ -52,14 +52,18 @@ const cerrarSesion = () => {
 
       <div class="separador"></div>
 
-      <!-- Usuario y Botón de Salir -->
+      <!-- Usuario (Solo Rol) y Botón de Salir -->
       <div class="info-usuario">
         <div class="avatar-usuario">
-          <IconoLucide nombre="User" :tamano="16" />
+          <IconoLucide nombre="Shield" :tamano="16" />
         </div>
         <div class="datos-usuario">
-          <span class="nombre-usuario">{{ authStore.usuario?.nombre || 'Administradora' }}</span>
-          <span class="rol-usuario">{{ authStore.usuario?.rol || 'Turno Tarde' }}</span>
+          <span class="rol-principal">
+            {{ authStore.esAdmin ? 'Dueña (Admin)' : 'Personal de Tienda' }}
+          </span>
+          <span class="turno-usuario">
+            {{ authStore.usuario?.turno || authStore.usuario?.email || 'Sesión Activa' }}
+          </span>
         </div>
         <button
           type="button"
@@ -95,14 +99,15 @@ const cerrarSesion = () => {
 }
 
 .cabecera-sidebar {
-  padding: 20px 20px 16px;
+  padding: 22px 20px 18px;
   border-bottom: 1px solid var(--color-neutral-200);
 }
 
 .titulo-marca {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--color-neutral-900);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--color-primario);
+  letter-spacing: 0.1em;
   line-height: 1.2;
 }
 
@@ -138,19 +143,20 @@ const cerrarSesion = () => {
 }
 
 .enlace-nav:hover {
-  background-color: var(--color-neutral-50);
-  color: var(--color-neutral-900);
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
 }
 
 .enlace-nav.enlace-activo {
-  background-color: var(--color-neutral-900);
+  background-color: var(--color-primario);
   color: var(--color-blanco);
+  font-weight: 600;
 }
 
 .pie-sidebar {
   padding: 16px;
   border-top: 1px solid var(--color-neutral-200);
-  background-color: var(--color-neutral-50);
+  background-color: var(--color-fondo-panel);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -170,7 +176,7 @@ const cerrarSesion = () => {
 
 .enlace-tienda:hover {
   background-color: var(--color-neutral-200);
-  color: var(--color-neutral-900);
+  color: var(--color-primario);
 }
 
 .separador {
@@ -185,15 +191,16 @@ const cerrarSesion = () => {
 }
 
 .avatar-usuario {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background-color: var(--color-neutral-200);
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-neutral-900);
   flex-shrink: 0;
+  border: 1px solid rgba(62, 18, 24, 0.1);
 }
 
 .datos-usuario {
@@ -203,16 +210,16 @@ const cerrarSesion = () => {
   min-width: 0;
 }
 
-.nombre-usuario {
+.rol-principal {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-neutral-900);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.rol-usuario {
+.turno-usuario {
   font-size: 11px;
   color: var(--color-neutral-600);
 }

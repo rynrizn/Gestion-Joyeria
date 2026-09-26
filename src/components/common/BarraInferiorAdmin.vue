@@ -78,7 +78,7 @@ const enlacesMovil = [
 }
 
 .boton-item.boton-activo {
-  color: var(--color-neutral-900);
+  color: var(--color-primario);
   font-weight: 700;
 }
 

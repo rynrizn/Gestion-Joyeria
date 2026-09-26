@@ -88,13 +88,13 @@ defineEmits(['click'])
   transform: none;
 }
 
-/* Variante Primaria: Dark Primary (#111827) */
+/* Variante Primaria: Borgoña Moonstone (#3E1218) */
 .boton-primario {
-  background-color: var(--color-neutral-900);
+  background-color: var(--color-primario);
   color: var(--color-blanco);
 }
 .boton-primario:hover:not(:disabled) {
-  background-color: #1f2937;
+  background-color: var(--color-primario-hover);
 }
 
 /* Variante Secundaria: Blanco con borde */
