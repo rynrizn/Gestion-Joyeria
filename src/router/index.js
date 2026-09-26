@@ -51,7 +51,7 @@ const routes = [
       {
         path: 'ventas',
         name: 'admin-ventas',
-        component: () => import('../views/InventarioView.vue'),
+        component: () => import('../views/RegistroVentaView.vue'),
       },
       {
         path: 'clientes',
