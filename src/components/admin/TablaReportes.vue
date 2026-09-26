@@ -11,6 +11,8 @@ defineProps({
     required: true,
   },
 })
+
+defineEmits(['ver-detalle'])
 </script>
 
 <template>
@@ -20,13 +22,13 @@ defineProps({
       <div class="tarjeta-kpi-cierre">
         <span class="etiqueta-cierre">Total Efectivo</span>
         <span class="monto-cierre">Bs. {{ totales.totalEfectivo }}</span>
-        <span class="subtexto-cierre">En caja física</span>
+        <span class="subtexto-cierre">En caja física (inc. híbridos)</span>
       </div>
 
       <div class="tarjeta-kpi-cierre">
         <span class="etiqueta-cierre">Total QR / Transferencia</span>
         <span class="monto-cierre">Bs. {{ totales.totalQR }}</span>
-        <span class="subtexto-cierre">Banco verificado</span>
+        <span class="subtexto-cierre">Banco verificado (inc. híbridos)</span>
       </div>
 
       <div class="tarjeta-kpi-cierre">
@@ -38,55 +40,83 @@ defineProps({
       <div class="tarjeta-kpi-cierre total-general">
         <span class="etiqueta-cierre">Gran Total del Período</span>
         <span class="monto-cierre destacado">Bs. {{ totales.totalGeneral }}</span>
-        <span class="subtexto-cierre">{{ ventas.length }} transacciones</span>
+        <span class="subtexto-cierre">{{ ventas.length }} transacciones registradas</span>
       </div>
     </div>
 
     <!-- Tabla Detallada de Transacciones -->
     <div class="contenedor-tabla-reporte">
       <div class="cabecera-tabla-reporte">
-        <h3 class="titulo-detalle">Detalle de Transacciones</h3>
+        <div>
+          <h3 class="titulo-detalle">Auditoría y Registro de Transacciones</h3>
+          <p class="subtitulo-detalle">Haz clic en cualquier venta para ver el ticket detallado</p>
+        </div>
       </div>
 
       <div class="scroll-tabla">
         <table class="tabla-transacciones">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Ticket</th>
               <th>Fecha y Hora</th>
-              <th>Joya Vendida</th>
-              <th>Cantidad</th>
+              <th>Clienta</th>
+              <th>Responsable / Turno</th>
+              <th>Joya(s)</th>
               <th>Método de Cobro</th>
-              <th>Turno</th>
-              <th class="col-monto">Total (Bs.)</th>
+              <th class="col-monto">Total</th>
+              <th class="col-accion">Detalle</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="venta in ventas" :key="venta.id">
+            <tr
+              v-for="venta in ventas"
+              :key="venta.id"
+              class="fila-transaccion-interactiva"
+              @click="$emit('ver-detalle', venta)"
+            >
               <td class="id-transaccion">#{{ venta.id }}</td>
               <td class="fecha-transaccion">{{ venta.fechaHora }}</td>
-              <td class="joya-transaccion">
-                <strong>{{ venta.producto }}</strong>
+              <td class="cliente-transaccion">{{ venta.cliente || 'Cliente Casual' }}</td>
+              <td class="vendedora-transaccion">
+                <span class="nombre-vend">{{ venta.vendedora || 'Personal' }}</span>
+                <span class="turno-vend">{{ venta.turno }}</span>
               </td>
-              <td>{{ venta.cantidad }} u.</td>
+              <td class="joya-transaccion">
+                <span class="texto-joyas-truncado">{{ venta.producto }}</span>
+              </td>
               <td>
                 <span
                   class="badge-metodo"
-                  :class="venta.metodoPago === 'EFECTIVO' ? 'efectivo' : 'qr'"
+                  :class="venta.metodoPago.toLowerCase()"
                 >
                   <IconoLucide
-                    :nombre="venta.metodoPago === 'EFECTIVO' ? 'Banknote' : 'QrCode'"
+                    :nombre="
+                      venta.metodoPago === 'EFECTIVO'
+                        ? 'Banknote'
+                        : venta.metodoPago === 'QR'
+                        ? 'QrCode'
+                        : 'Split'
+                    "
                     :tamano="13"
                   />
                   <span>{{ venta.metodoPago }}</span>
                 </span>
               </td>
-              <td class="turno-texto">{{ venta.turno }}</td>
               <td class="col-monto monto-negrita">Bs. {{ venta.montoTotal }}</td>
+              <td class="col-accion" @click.stop="$emit('ver-detalle', venta)">
+                <button
+                  type="button"
+                  class="btn-ver-ticket"
+                  title="Ver desglose del ticket"
+                >
+                  <IconoLucide nombre="Eye" :tamano="14" />
+                  <span>Ver</span>
+                </button>
+              </td>
             </tr>
 
             <tr v-if="ventas.length === 0">
-              <td colspan="7" class="fila-sin-ventas">
+              <td colspan="8" class="fila-sin-ventas">
                 No hay ventas registradas en el período seleccionado.
               </td>
             </tr>
@@ -134,20 +164,20 @@ defineProps({
 }
 
 .tarjeta-kpi-cierre.total-general {
-  background-color: var(--color-neutral-900);
-  border-color: var(--color-neutral-900);
+  background-color: var(--color-primario);
+  border-color: var(--color-primario);
   color: var(--color-blanco);
 }
 
 .tarjeta-kpi-cierre.total-general .etiqueta-cierre,
 .tarjeta-kpi-cierre.total-general .subtexto-cierre {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .etiqueta-cierre {
   font-size: 12px;
   color: var(--color-neutral-600);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .monto-cierre {
@@ -177,12 +207,19 @@ defineProps({
 .cabecera-tabla-reporte {
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-neutral-200);
+  background-color: var(--color-fondo-panel);
 }
 
 .titulo-detalle {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--color-neutral-900);
+}
+
+.subtitulo-detalle {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  margin-top: 2px;
 }
 
 .scroll-tabla {
@@ -199,9 +236,9 @@ defineProps({
 
 .tabla-transacciones th {
   background-color: var(--color-neutral-50);
-  padding: 12px 16px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--color-neutral-600);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -210,17 +247,22 @@ defineProps({
 }
 
 .tabla-transacciones td {
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--color-neutral-200);
   vertical-align: middle;
 }
 
-.tabla-transacciones tr:last-child td {
-  border-bottom: none;
+.fila-transaccion-interactiva {
+  cursor: pointer;
+  transition: background-color var(--transicion-rapida);
+}
+
+.fila-transaccion-interactiva:hover {
+  background-color: var(--color-primario-fondo);
 }
 
 .id-transaccion {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-neutral-600);
   font-size: 12px;
 }
@@ -231,6 +273,40 @@ defineProps({
   white-space: nowrap;
 }
 
+.cliente-transaccion {
+  font-weight: 600;
+  color: var(--color-neutral-900);
+}
+
+.vendedora-transaccion {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nombre-vend {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.turno-vend {
+  font-size: 10px;
+  color: var(--color-neutral-600);
+}
+
+.joya-transaccion {
+  max-width: 220px;
+}
+
+.texto-joyas-truncado {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+}
+
 .badge-metodo {
   display: inline-flex;
   align-items: center;
@@ -238,7 +314,7 @@ defineProps({
   padding: 2px 8px;
   border-radius: var(--radio-sm);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .badge-metodo.efectivo {
@@ -251,9 +327,9 @@ defineProps({
   color: var(--color-alerta);
 }
 
-.turno-texto {
-  font-size: 12px;
-  color: var(--color-neutral-600);
+.badge-metodo.hibrido {
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
 }
 
 .col-monto {
@@ -262,8 +338,34 @@ defineProps({
 }
 
 .monto-negrita {
+  font-weight: 800;
+  color: var(--color-primario);
+}
+
+.col-accion {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn-ver-ticket {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radio-sm);
+  background-color: var(--color-blanco);
+  border: 1px solid var(--color-neutral-200);
+  font-size: 11px;
   font-weight: 700;
-  color: var(--color-neutral-900);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+  transition: all var(--transicion-rapida);
+}
+
+.btn-ver-ticket:hover {
+  background-color: var(--color-primario);
+  color: var(--color-blanco);
+  border-color: var(--color-primario);
 }
 
 .fila-sin-ventas {
