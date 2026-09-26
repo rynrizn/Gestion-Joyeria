@@ -1,25 +1,84 @@
-/**
- * =============================================================================
- * Vue Router: Configuración de Rutas y Guards de Navegación
- * =============================================================================
- * Responsabilidad:
- * - Definir la jerarquía de rutas para las vistas públicas y el panel administrativo.
- * - Proteger rutas que requieren autenticación mediante meta tags (`requiresAuth: true`).
- * - Integrar guardias de navegación global (`router.beforeEach`) con el store de autenticación.
- *
- * Rutas a mapear:
- * 1. Públicas:
- *    - `/`: CatalogoPublico.vue (Catálogo principal de exhibición y reserva para clientes).
- *    - `/login`: LoginView.vue (Acceso para administradores y encargados de tienda).
- * 2. Administrativas / Protegidas:
- *    - `/admin/inventario`: InventarioView.vue (Gestión integral de stock y piezas).
- *    - `/admin/reservas`: ReservasDashboard.vue (Control de solicitudes de reserva de clientes).
- *    - `/admin/reportes`: ReportesView.vue (Métricas, balances de ventas y rotación).
- *
- * Código a implementar:
- * 1. Importar `createRouter` y `createWebHistory` de 'vue-router'.
- * 2. Importar vistas correspondientes mediante carga perezosa (lazy loading / dynamic import).
- * 3. Instanciar router y registrar el hook `beforeEach` para verificar token de sesión en Supabase/Pinia.
- * 4. Exportar default router.
- * =============================================================================
- */
+import { createRouter, createWebHistory } from 'vue-router'
+import LayoutPublico from '../layouts/LayoutPublico.vue'
+import LayoutAdmin from '../layouts/LayoutAdmin.vue'
+
+const routes = [
+  // Rutas Públicas (para clientes, libres y anónimas)
+  {
+    path: '/',
+    component: LayoutPublico,
+    children: [
+      {
+        path: '',
+        name: 'catalogo',
+        component: () => import('../views/CatalogoPublico.vue'),
+      },
+      {
+        path: 'producto/:id',
+        name: 'producto-detalle',
+        component: () => import('../views/CatalogoPublico.vue'),
+      },
+    ],
+  },
+
+  // Ruta de Autenticación (Exclusiva para dueña y personal de tienda)
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/LoginView.vue'),
+  },
+
+  // Rutas Administrativas (Gestor Interno - Dueña y Vendedoras)
+  {
+    path: '/admin',
+    component: LayoutAdmin,
+    meta: { requiereAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: '/admin/dashboard',
+      },
+      {
+        path: 'dashboard',
+        name: 'admin-dashboard',
+        component: () => import('../views/ReservasDashboard.vue'),
+      },
+      {
+        path: 'inventario',
+        name: 'admin-inventario',
+        component: () => import('../views/InventarioView.vue'),
+      },
+      {
+        path: 'ventas',
+        name: 'admin-ventas',
+        component: () => import('../views/InventarioView.vue'),
+      },
+      {
+        path: 'clientes',
+        name: 'admin-clientes',
+        component: () => import('../views/ReservasDashboard.vue'),
+      },
+      {
+        path: 'reportes',
+        name: 'admin-reportes',
+        component: () => import('../views/ReportesView.vue'),
+      },
+    ],
+  },
+
+  // Redirección de cualquier ruta desconocida al catálogo
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
+  },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior() {
+    return { top: 0 }
+  },
+})
+
+export default router
