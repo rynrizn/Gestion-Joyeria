@@ -16,7 +16,7 @@ const routes = [
       {
         path: 'producto/:id',
         name: 'producto-detalle',
-        component: () => import('../views/CatalogoPublico.vue'),
+        component: () => import('../views/FichaProductoView.vue'),
       },
     ],
   },
