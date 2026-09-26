@@ -80,6 +80,43 @@ const manejarSubidaFoto = (evento, numeroFoto) => {
   }
 }
 
+/**
+ * =============================================================================
+ * GUÍA DE SUBIDA DE IMÁGENES A SUPABASE STORAGE BUCKET: 'joyas-fotos'
+ * =============================================================================
+ *
+ * async function subirFotoASupabase(archivo, idProducto, esPortada = true) {
+ *   // 1. Crear nombre de archivo único
+ *   const extension = archivo.name.split('.').pop()
+ *   const nombreArchivo = `${idProducto}_${esPortada ? 'portada' : 'detalle'}_${Date.now()}.${extension}`
+ *   const rutaStorage = `productos/${nombreArchivo}`
+ *
+ *   // 2. Subir binario al Storage bucket público
+ *   const { error: errorSubida } = await supabase.storage
+ *     .from('joyas-fotos')
+ *     .upload(rutaStorage, archivo, {
+ *       cacheControl: '3600',
+ *       upsert: true,
+ *     })
+ *   if (errorSubida) throw errorSubida
+ *
+ *   // 3. Obtener URL pública
+ *   const { data: { publicUrl } } = supabase.storage
+ *     .from('joyas-fotos')
+ *     .getPublicUrl(rutaStorage)
+ *
+ *   // 4. Registrar en la tabla PostgreSQL 'imagen_producto'
+ *   await supabase.from('imagen_producto').insert({
+ *     id_producto: idProducto,
+ *     url_imagen: publicUrl,
+ *     es_portada: esPortada,
+ *   })
+ *
+ *   return publicUrl
+ * }
+ * =============================================================================
+ */
+
 const enviarFormulario = () => {
   if (!nombre.value.trim() || !precio.value) {
     alert('Por favor, completa al menos el nombre y el precio de la joya.')

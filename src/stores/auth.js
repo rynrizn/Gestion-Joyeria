@@ -96,7 +96,59 @@ export const useAuthStore = defineStore('auth', () => {
     },
   ]
 
-  // Iniciar sesión con validación de credenciales e intentos
+  /**
+   * ===========================================================================
+   * GUÍA DE INTEGRACIÓN CON SUPABASE AUTH (CÓDIGO COMENTADO)
+   * ===========================================================================
+   *
+   * 1. INICIAR SESIÓN REAL CON SUPABASE AUTH:
+   * const iniciarSesionSupabase = async (email, password) => {
+   *   cargando.value = true
+   *   error.value = ''
+   *   try {
+   *     // Autentica contra el servicio GoTrue de Supabase
+   *     const { data, error: errorAuth } = await supabase.auth.signInWithPassword({
+   *       email,
+   *       password,
+   *     })
+   *     if (errorAuth) throw errorAuth
+   *
+   *     // Consulta datos de rol en la tabla PostgreSQL 'usuario' vinculada al id
+   *     const { data: usuarioBD, error: errorUsuario } = await supabase
+   *       .from('usuario')
+   *       .select('id_usuario, nombre, id_rol, rol(nombre)')
+   *       .eq('id_usuario', data.user.id)
+   *       .single()
+   *     if (errorUsuario) throw errorUsuario
+   *
+   *     usuario.value = {
+   *       id: usuarioBD.id_usuario,
+   *       nombre: usuarioBD.nombre,
+   *       email: data.user.email,
+   *       rol: usuarioBD.rol?.nombre || 'PERSONAL_TIENDA',
+   *       turno: 'Turno Tarde',
+   *     }
+   *     localStorage.setItem(CLAVE_SESION, JSON.stringify(usuario.value))
+   *     return { exito: true }
+   *   } catch (err) {
+   *     error.value = err.message || 'Error al iniciar sesión en Supabase'
+   *     return { exito: false, mensaje: error.value }
+   *   } finally {
+   *     cargando.value = false
+   *   }
+   * }
+   *
+   * 2. RESTAURAR SESIÓN AL RECARGAR PÁGINA (main.js o App.vue):
+   * const verificarSesionActiva = async () => {
+   *   const { data: { session } } = await supabase.auth.getSession()
+   *   if (session) {
+   *     // Mantener usuario activo consultando su perfil
+   *   }
+   * }
+   * ===========================================================================
+   */
+
+  // Iniciar sesión con validación de credenciales e intentos (Modo demo reactivo con protección contra fuerza bruta)
   const iniciarSesion = async (identificador, contrasena) => {
     cargando.value = true
     error.value = ''
