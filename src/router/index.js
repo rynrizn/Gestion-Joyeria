@@ -56,7 +56,7 @@ const routes = [
       {
         path: 'clientes',
         name: 'admin-clientes',
-        component: () => import('../views/ReservasDashboard.vue'),
+        component: () => import('../views/ClientesReservasView.vue'),
       },
       {
         path: 'reportes',
