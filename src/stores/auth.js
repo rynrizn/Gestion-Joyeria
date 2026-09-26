@@ -1,26 +1,56 @@
-/**
- * =============================================================================
- * Pinia Store: Auth (Autenticación y Sesión de Usuario)
- * =============================================================================
- * Responsabilidad:
- * - Gestionar el estado de autenticación del usuario administrativo.
- * - Sincronizar sesiones activas mediante el cliente de Supabase Auth.
- * - Exponer getters de verificación de permisos y métodos de login/logout.
- *
- * Código a implementar:
- * 1. Importar `defineStore` de 'pinia' y el cliente `supabase` de '@/supabase/client.js'.
- * 2. State:
- *    - user: ref(null) / null -> Datos del usuario autenticado (id, email, metadata).
- *    - session: ref(null) / null -> Token JWT y tiempo de expiración.
- *    - loading: ref(false) / boolean -> Bandera de carga durante peticiones de auth.
- *    - error: ref(null) / string | null -> Mensaje de error legible en caso de fallos.
- * 3. Getters:
- *    - isAuthenticated: (state) => !!state.user
- *    - userRole: (state) => state.user?.user_metadata?.role || 'user'
- * 4. Actions:
- *    - login(email, password): Autentica con supabase.auth.signInWithPassword().
- *    - logout(): Cierra sesión mediante supabase.auth.signOut() y limpia el estado local.
- *    - checkCurrentSession(): Verifica y restaura la sesión existente con supabase.auth.getSession().
- *    - setupAuthListener(): Escucha cambios de auth con supabase.auth.onAuthStateChange().
- * =============================================================================
- */
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+export const useAuthStore = defineStore('auth', () => {
+  // Estado reactivo con datos de demostración
+  const usuario = ref({
+    id: 1,
+    nombre: 'Sofía Valdivia',
+    email: 'admin@moonstone.bo',
+    rol: 'ADMINISTRADORA',
+    turno: 'Turno Tarde',
+  })
+
+  const estaAutenticado = computed(() => !!usuario.value)
+  const esAdmin = computed(() => usuario.value?.rol === 'ADMINISTRADORA')
+  const cargando = ref(false)
+  const error = ref('')
+
+  // Acción mock para iniciar sesión
+  const iniciarSesion = async (email, password) => {
+    cargando.value = true
+    error.value = ''
+
+    try {
+      // Simulación de autenticación local
+      usuario.value = {
+        id: 1,
+        nombre: 'Sofía Valdivia',
+        email: email || 'admin@moonstone.bo',
+        rol: 'ADMINISTRADORA',
+        turno: 'Turno Tarde',
+      }
+      return true
+    } catch (err) {
+      error.value = 'Credenciales no válidas'
+      return false
+    } finally {
+      cargando.value = false
+    }
+  }
+
+  // Acción mock para cerrar sesión
+  const cerrarSesion = () => {
+    usuario.value = null
+  }
+
+  return {
+    usuario,
+    estaAutenticado,
+    esAdmin,
+    cargando,
+    error,
+    iniciarSesion,
+    cerrarSesion,
+  }
+})
