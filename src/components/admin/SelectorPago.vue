@@ -5,7 +5,7 @@ defineProps({
   modelValue: {
     type: String,
     default: 'EFECTIVO',
-    validator: (v) => ['EFECTIVO', 'QR'].includes(v),
+    validator: (v) => ['EFECTIVO', 'QR', 'HIBRIDO'].includes(v),
   },
 })
 
@@ -14,31 +14,45 @@ defineEmits(['update:modelValue'])
 
 <template>
   <div class="contenedor-selector-pago">
-    <!-- Opción Efectivo -->
+    <!-- Opción 1: Efectivo -->
     <button
       type="button"
       class="boton-toggle-pago"
       :class="{ activo: modelValue === 'EFECTIVO' }"
       @click="$emit('update:modelValue', 'EFECTIVO')"
     >
-      <IconoLucide nombre="Banknote" :tamano="22" />
+      <IconoLucide nombre="Banknote" :tamano="20" />
       <div class="textos-opcion">
         <span class="titulo-opcion">Efectivo</span>
-        <span class="subtexto-opcion">Cobro físico en mano</span>
+        <span class="subtexto-opcion">Pago en mano</span>
       </div>
     </button>
 
-    <!-- Opción QR / Transferencia -->
+    <!-- Opción 2: QR / Transferencia -->
     <button
       type="button"
       class="boton-toggle-pago"
       :class="{ activo: modelValue === 'QR' }"
       @click="$emit('update:modelValue', 'QR')"
     >
-      <IconoLucide nombre="QrCode" :tamano="22" />
+      <IconoLucide nombre="QrCode" :tamano="20" />
       <div class="textos-opcion">
-        <span class="titulo-opcion">Código QR / Transferencia</span>
-        <span class="subtexto-opcion">Verificación en comprobante</span>
+        <span class="titulo-opcion">Código QR</span>
+        <span class="subtexto-opcion">Transferencia</span>
+      </div>
+    </button>
+
+    <!-- Opción 3: Híbrido (Efectivo + QR) -->
+    <button
+      type="button"
+      class="boton-toggle-pago"
+      :class="{ activo: modelValue === 'HIBRIDO' }"
+      @click="$emit('update:modelValue', 'HIBRIDO')"
+    >
+      <IconoLucide nombre="Split" :tamano="20" />
+      <div class="textos-opcion">
+        <span class="titulo-opcion">Híbrido</span>
+        <span class="subtexto-opcion">Efectivo + QR</span>
       </div>
     </button>
   </div>
@@ -48,21 +62,21 @@ defineEmits(['update:modelValue'])
 .contenedor-selector-pago {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 }
 
-@media (min-width: 480px) {
+@media (min-width: 520px) {
   .contenedor-selector-pago {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 .boton-toggle-pago {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: var(--radio-md);
   border: 2px solid var(--color-neutral-200);
   background-color: var(--color-blanco);
@@ -73,14 +87,14 @@ defineEmits(['update:modelValue'])
 }
 
 .boton-toggle-pago:hover:not(.activo) {
-  border-color: #d1d5db;
+  border-color: var(--color-neutral-300);
   background-color: var(--color-neutral-50);
   color: var(--color-neutral-900);
 }
 
 .boton-toggle-pago.activo {
-  border-color: var(--color-neutral-900);
-  background-color: var(--color-neutral-900);
+  border-color: var(--color-primario);
+  background-color: var(--color-primario);
   color: var(--color-blanco);
   box-shadow: var(--sombra-sutil);
 }
@@ -91,14 +105,14 @@ defineEmits(['update:modelValue'])
 }
 
 .titulo-opcion {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .subtexto-opcion {
-  font-size: 11px;
-  opacity: 0.8;
+  font-size: 10px;
+  opacity: 0.85;
   margin-top: 2px;
 }
 </style>
