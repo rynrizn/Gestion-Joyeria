@@ -1,8 +1,19 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import InputTexto from '../common/InputTexto.vue'
 import BotonPrincipal from '../common/BotonPrincipal.vue'
 import IconoLucide from '../common/IconoLucide.vue'
+
+const props = defineProps({
+  productoInicial: {
+    type: Object,
+    default: null,
+  },
+  modo: {
+    type: String,
+    default: 'crear',
+  },
+})
 
 const emit = defineEmits(['guardar', 'cancelar'])
 
@@ -35,6 +46,31 @@ const materialesDisponibles = [
   'Titanio Grado Implante',
 ]
 
+// Sincronizar datos si estamos en modo edición
+watch(
+  () => props.productoInicial,
+  (p) => {
+    if (p) {
+      nombre.value = p.nombre || ''
+      categoria.value = p.categoria || 'Anillos'
+      material.value = p.material || 'Acero 316L'
+      precio.value = p.precio !== undefined ? p.precio : (p.precio_venta || '')
+      stockInicial.value = p.stockCentral !== undefined ? p.stockCentral : (p.stock || 5)
+      foto1Preview.value = p.imagen || ''
+      foto2Preview.value = p.imagen_detalle || ''
+    } else {
+      nombre.value = ''
+      categoria.value = 'Anillos'
+      material.value = 'Acero 316L'
+      precio.value = ''
+      stockInicial.value = 5
+      foto1Preview.value = ''
+      foto2Preview.value = ''
+    }
+  },
+  { immediate: true }
+)
+
 const manejarSubidaFoto = (evento, numeroFoto) => {
   const archivo = evento.target.files[0]
   if (archivo) {
@@ -51,11 +87,13 @@ const enviarFormulario = () => {
   }
 
   emit('guardar', {
-    nombre: nombre.value,
+    id: props.productoInicial?.id,
+    nombre: nombre.value.trim(),
     categoria: categoria.value,
     material: material.value,
     precio: Number(precio.value),
     stockInicial: Number(stockInicial.value),
+    stockCentral: Number(stockInicial.value),
     imagen: foto1Preview.value || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
     imagen_detalle: foto2Preview.value || '',
   })
@@ -67,7 +105,7 @@ const enviarFormulario = () => {
     <!-- Nombre -->
     <InputTexto
       v-model="nombre"
-      etiqueta="Nombre de la pieza"
+      etiqueta="Nombre de la pieza *"
       placeholder="Ej. Anillo Serpiente Regulable"
       requerido
     />
@@ -98,7 +136,7 @@ const enviarFormulario = () => {
       <InputTexto
         v-model="precio"
         tipo="number"
-        etiqueta="Precio de venta (Bs.)"
+        etiqueta="Precio de venta (Bs.) *"
         placeholder="Ej. 45"
         requerido
       />
@@ -106,7 +144,7 @@ const enviarFormulario = () => {
       <InputTexto
         v-model="stockInicial"
         tipo="number"
-        etiqueta="Stock inicial (Central)"
+        :etiqueta="modo === 'editar' ? 'Stock en Central (Dueña)' : 'Stock inicial (Central) *'"
         placeholder="Ej. 10"
         requerido
       />
@@ -114,7 +152,7 @@ const enviarFormulario = () => {
 
     <!-- Carga de 2 Fotos WebP (Foto 1 y Foto 2) -->
     <div class="seccion-carga-fotos">
-      <label class="etiqueta-select">Fotografías del producto (2 fotos en .webp)</label>
+      <label class="etiqueta-select">Fotografías de la joya (2 fotos)</label>
       <div class="cuadricula-cajas-foto">
         <!-- Foto 1 (Principal) -->
         <label class="caja-subida" :class="{ 'con-foto': foto1Preview }">
@@ -161,7 +199,7 @@ const enviarFormulario = () => {
       </button>
 
       <BotonPrincipal tipo="submit">
-        Guardar Joya en Inventario
+        {{ modo === 'editar' ? 'Guardar Cambios' : 'Guardar Joya en Inventario' }}
       </BotonPrincipal>
     </div>
   </form>
@@ -212,7 +250,7 @@ const enviarFormulario = () => {
 }
 
 .control-select:focus {
-  border-color: var(--color-neutral-900);
+  border-color: var(--color-primario);
 }
 
 .seccion-carga-fotos {
@@ -230,7 +268,7 @@ const enviarFormulario = () => {
 .caja-subida {
   position: relative;
   aspect-ratio: 1 / 1;
-  border: 2px dashed var(--color-neutral-200);
+  border: 2px dashed var(--color-neutral-300);
   border-radius: var(--radio-md);
   background-color: var(--color-neutral-50);
   display: flex;
@@ -247,9 +285,9 @@ const enviarFormulario = () => {
 }
 
 .caja-subida:hover {
-  border-color: var(--color-neutral-900);
-  background-color: #F3F4F6;
-  color: var(--color-neutral-900);
+  border-color: var(--color-primario);
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
 }
 
 .preview-img {
@@ -260,7 +298,7 @@ const enviarFormulario = () => {
 
 .texto-caja-subida {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .subtexto-caja-subida {

@@ -8,7 +8,7 @@ defineProps({
   },
 })
 
-defineEmits(['crear-reserva', 'contactar'])
+defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
 </script>
 
 <template>
@@ -80,16 +80,28 @@ defineEmits(['crear-reserva', 'contactar'])
             <!-- Última Visita -->
             <td class="fecha-visita">{{ c.ultimaVisita }}</td>
 
-            <!-- Acción: Crear Reserva Temporal -->
+            <!-- Acciones: Historial y Crear Reserva Temporal -->
             <td class="col-acciones">
-              <button
-                type="button"
-                class="boton-crear-reserva"
-                @click="$emit('crear-reserva', c)"
-              >
-                <IconoLucide nombre="CalendarPlus" :tamano="14" />
-                <span>Apartar Joya</span>
-              </button>
+              <div class="grupo-acciones-cliente">
+                <button
+                  type="button"
+                  class="boton-historial-cliente"
+                  title="Consultar historial de compras previas"
+                  @click="$emit('ver-historial', c)"
+                >
+                  <IconoLucide nombre="History" :tamano="14" />
+                  <span>Historial</span>
+                </button>
+                <button
+                  type="button"
+                  class="boton-crear-reserva"
+                  title="Crear apartado temporal"
+                  @click="$emit('crear-reserva', c)"
+                >
+                  <IconoLucide nombre="CalendarPlus" :tamano="14" />
+                  <span>Apartar</span>
+                </button>
+              </div>
             </td>
           </tr>
 
@@ -223,13 +235,40 @@ defineEmits(['crear-reserva', 'contactar'])
   white-space: nowrap;
 }
 
+.grupo-acciones-cliente {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.boton-historial-cliente {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: var(--radio-sm);
+  background-color: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-200);
+  color: var(--color-neutral-800);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transicion-rapida);
+}
+
+.boton-historial-cliente:hover {
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
+  border-color: rgba(62, 18, 24, 0.2);
+}
+
 .boton-crear-reserva {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
   border-radius: var(--radio-sm);
-  background-color: var(--color-neutral-900);
+  background-color: var(--color-primario);
   color: var(--color-blanco);
   font-size: 12px;
   font-weight: 600;
@@ -238,7 +277,7 @@ defineEmits(['crear-reserva', 'contactar'])
 }
 
 .boton-crear-reserva:hover {
-  background-color: #1f2937;
+  background-color: var(--color-primario-hover);
 }
 
 .fila-vacia {
