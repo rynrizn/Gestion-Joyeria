@@ -81,4 +81,22 @@ const router = createRouter({
   },
 })
 
+// Navigation Guard de Seguridad: Protege todas las rutas de /admin/*
+router.beforeEach((to, from, next) => {
+  const sesionGuardada = localStorage.getItem('moonstone_usuario')
+  const estaAutenticado = !!sesionGuardada
+
+  const requiereAuth = to.matched.some((record) => record.meta.requiereAuth)
+
+  if (requiereAuth && !estaAutenticado) {
+    // Si intenta acceder a /admin/* sin autenticarse, se redirige inmediatamente al login
+    next({ name: 'login', query: { redirect: to.fullPath } })
+  } else if (to.name === 'login' && estaAutenticado) {
+    // Si ya está autenticado e intenta ir a login, se le envía al dashboard
+    next({ name: 'admin-dashboard' })
+  } else {
+    next()
+  }
+})
+
 export default router
