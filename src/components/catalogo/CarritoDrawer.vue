@@ -1,10 +1,11 @@
 <script setup>
 import { watch, onMounted, onUnmounted } from 'vue'
-import { useCarritoStore } from '../../stores/carrito'
+import { useReservasStore } from '../../stores/reservas'
 import IconoLucide from '../common/IconoLucide.vue'
 import ItemCarrito from './ItemCarrito.vue'
 
 const carrito = useCarritoStore()
+const reservasStore = useReservasStore()
 
 // Manejo de tecla ESC para cerrar el drawer
 const manejarTeclaEsc = (evento) => {
@@ -35,6 +36,10 @@ onUnmounted(() => {
 })
 
 const pedirPorWhatsApp = () => {
+  // 1. Generar reserva temporal automática (24h) para que la dueña la gestione desde el dashboard
+  reservasStore.crearReservaDesdeCarrito(carrito.items, carrito.subtotal)
+
+  // 2. Abrir WhatsApp con el pedido formateado
   const url = carrito.generarEnlaceWhatsApp()
   window.open(url, '_blank')
 }
