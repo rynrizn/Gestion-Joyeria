@@ -1,5 +1,6 @@
 <script setup>
 import { watch, onMounted, onUnmounted } from 'vue'
+import { useCarritoStore } from '../../stores/carrito'
 import { useReservasStore } from '../../stores/reservas'
 import IconoLucide from '../common/IconoLucide.vue'
 import ItemCarrito from './ItemCarrito.vue'
