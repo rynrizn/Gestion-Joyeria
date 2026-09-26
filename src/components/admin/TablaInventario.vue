@@ -6,6 +6,10 @@ defineProps({
     type: Array,
     required: true,
   },
+  esAdmin: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 defineEmits(['mover-stock', 'editar'])
@@ -76,9 +80,9 @@ defineEmits(['mover-stock', 'editar'])
             <!-- Precio -->
             <td class="precio-col">Bs. {{ joya.precio }}</td>
 
-            <!-- Acciones: Mover Stock y Editar -->
+            <!-- Acciones: Mover Stock y Editar (Solo Administradora) -->
             <td class="col-acciones">
-              <div class="grupo-acciones">
+              <div v-if="esAdmin" class="grupo-acciones">
                 <button
                   type="button"
                   class="boton-traslado"
@@ -97,6 +101,10 @@ defineEmits(['mover-stock', 'editar'])
                   <IconoLucide nombre="Edit" :tamano="14" />
                 </button>
               </div>
+              <span v-else class="badge-solo-lectura" title="Solo la Administradora puede alterar el inventario">
+                <IconoLucide nombre="Eye" :tamano="13" />
+                <span>Solo Consulta</span>
+              </span>
             </td>
           </tr>
 
@@ -276,6 +284,19 @@ defineEmits(['mover-stock', 'editar'])
 .boton-editar:hover {
   background-color: var(--color-neutral-200);
   color: var(--color-neutral-900);
+}
+
+.badge-solo-lectura {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-neutral-600);
+  background-color: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  padding: 4px 8px;
+  border-radius: var(--radio-sm);
 }
 
 .fila-vacia {

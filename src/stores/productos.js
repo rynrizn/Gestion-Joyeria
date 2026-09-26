@@ -136,6 +136,44 @@ export const useProductosStore = defineStore('productos', () => {
     return productos.value.find((p) => p.id === Number(id)) || null
   }
 
+  // Actualizar datos de un producto (sincronizado con inventario)
+  const actualizarProducto = (id, datos) => {
+    const p = productos.value.find((it) => it.id === Number(id))
+    if (p) {
+      if (datos.nombre !== undefined) p.nombre = datos.nombre
+      if (datos.categoria !== undefined) p.categoria = datos.categoria
+      if (datos.material !== undefined) p.material = datos.material
+      if (datos.precio !== undefined) p.precio_venta = Number(datos.precio)
+      if (datos.imagen) p.imagen = datos.imagen
+      if (datos.imagen_detalle !== undefined) p.imagen_detalle = datos.imagen_detalle
+      return true
+    }
+    return false
+  }
+
+  // Agregar nuevo producto
+  const agregarProducto = (nuevo) => {
+    const id = productos.value.length ? Math.max(...productos.value.map((it) => it.id)) + 1 : 1
+    const p = {
+      id,
+      nombre: nuevo.nombre,
+      categoria: nuevo.categoria,
+      material: nuevo.material,
+      color: 'Plateado',
+      talla: 'Estándar',
+      precio_venta: Number(nuevo.precio || 0),
+      stock: Number(nuevo.stockInicial || 0),
+      stockCentral: Number(nuevo.stockInicial || 0),
+      stockTienda: 0,
+      es_prioritario: false,
+      descripcion: `${nuevo.nombre} en ${nuevo.material}, diseño exclusivo Moonstone.`,
+      imagen: nuevo.imagen || '',
+      imagen_detalle: nuevo.imagen_detalle || '',
+    }
+    productos.value.unshift(p)
+    return p
+  }
+
   return {
     productos,
     categorias,
@@ -143,5 +181,7 @@ export const useProductosStore = defineStore('productos', () => {
     busqueda,
     productosFiltrados,
     obtenerPorId,
+    actualizarProducto,
+    agregarProducto,
   }
 })

@@ -1,19 +1,32 @@
 <script setup>
 import { ref } from 'vue'
 import { useInventarioStore } from '../stores/inventario'
+import { useProductosStore } from '../stores/productos'
+import { useAuthStore } from '../stores/auth'
 import TablaInventario from '../components/admin/TablaInventario.vue'
 import FormProducto from '../components/admin/FormProducto.vue'
 import ModalBase from '../components/common/ModalBase.vue'
+import ModalAlerta from '../components/common/ModalAlerta.vue'
 import BotonPrincipal from '../components/common/BotonPrincipal.vue'
 import Buscador from '../components/catalogo/Buscador.vue'
 import IconoLucide from '../components/common/IconoLucide.vue'
 
 const inventarioStore = useInventarioStore()
+const productosStore = useProductosStore()
+const authStore = useAuthStore()
 
 // Modales
 const modalAltaVisible = ref(false)
+const modalEdicionVisible = ref(false)
 const modalTrasladoVisible = ref(false)
 const joyaSeleccionada = ref(null)
+const joyaEnEdicion = ref(null)
+
+// Modal de Error / Feedback
+const modalErrorVisible = ref(false)
+const modalErrorTitulo = ref('')
+const modalErrorMensaje = ref('')
+const modalErrorDetalles = ref('')
 
 // Datos del formulario de traslado
 const cantidadTraslado = ref(1)
@@ -21,10 +34,36 @@ const origenTraslado = ref('central')
 const destinoTraslado = ref('tienda')
 
 const abrirAlta = () => {
+  if (!authStore.esAdmin) {
+    modalErrorTitulo.value = 'Permiso Denegado'
+    modalErrorMensaje.value = 'Solo la Administradora (Dueña) tiene autorización para dar de alta nuevas joyas en el inventario.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
+    return
+  }
   modalAltaVisible.value = true
 }
 
+const abrirEdicion = (joya) => {
+  if (!authStore.esAdmin) {
+    modalErrorTitulo.value = 'Permiso Denegado'
+    modalErrorMensaje.value = 'Solo la Administradora (Dueña) tiene autorización para editar los datos o precios de las joyas.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
+    return
+  }
+  joyaEnEdicion.value = joya
+  modalEdicionVisible.value = true
+}
+
 const abrirTraslado = (joya) => {
+  if (!authStore.esAdmin) {
+    modalErrorTitulo.value = 'Permiso Denegado'
+    modalErrorMensaje.value = 'Solo la Administradora (Dueña) puede autorizar y realizar traslados de stock entre sedes.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
+    return
+  }
   joyaSeleccionada.value = joya
   cantidadTraslado.value = 1
   origenTraslado.value = 'central'
@@ -34,11 +73,31 @@ const abrirTraslado = (joya) => {
 
 const guardarNuevaJoya = (datos) => {
   inventarioStore.agregarProducto(datos)
+  productosStore.agregarProducto(datos)
   modalAltaVisible.value = false
+}
+
+const guardarEdicionJoya = (datos) => {
+  inventarioStore.actualizarProducto(datos.id, datos)
+  productosStore.actualizarProducto(datos.id, datos)
+  modalEdicionVisible.value = false
+  joyaEnEdicion.value = null
 }
 
 const ejecutarTraslado = () => {
   if (!joyaSeleccionada.value) return
+
+  const stockDisponible = origenTraslado.value === 'central'
+    ? joyaSeleccionada.value.stockCentral
+    : joyaSeleccionada.value.stockTienda
+
+  if (Number(cantidadTraslado.value) > stockDisponible) {
+    modalErrorTitulo.value = 'Stock Insuficiente en Origen'
+    modalErrorMensaje.value = `No es posible trasladar ${cantidadTraslado.value} unidades. La sede de origen solo dispone de ${stockDisponible} unidad(es).`
+    modalErrorDetalles.value = `Origen: ${origenTraslado.value === 'central' ? 'Central (Dueña)' : 'Tienda (Mercadito Creativo)'}`
+    modalErrorVisible.value = true
+    return
+  }
 
   const exito = inventarioStore.moverStock(
     joyaSeleccionada.value.id,
@@ -50,14 +109,17 @@ const ejecutarTraslado = () => {
   if (exito) {
     modalTrasladoVisible.value = false
   } else {
-    alert('Stock insuficiente en la sede de origen para realizar el traslado.')
+    modalErrorTitulo.value = 'Error en el Traslado'
+    modalErrorMensaje.value = 'Ocurrió un error al procesar el movimiento de existencias.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
   }
 }
 </script>
 
 <template>
   <div class="pantalla-inventario">
-    <!-- Encabezado con Botón de Alta -->
+    <!-- Encabezado con Indicador de Rol y Botón de Alta -->
     <header class="cabecera-inventario">
       <div>
         <h1 class="titulo-vista">Inventario Multisede</h1>
@@ -66,12 +128,24 @@ const ejecutarTraslado = () => {
         </p>
       </div>
 
-      <BotonPrincipal @click="abrirAlta">
-        <template #iconoIzquierda>
-          <IconoLucide nombre="Plus" :tamano="18" />
-        </template>
-        <span>Nueva Joya</span>
-      </BotonPrincipal>
+      <div class="acciones-cabecera">
+        <!-- Badge informativo de permisos -->
+        <span
+          class="badge-permiso"
+          :class="authStore.esAdmin ? 'badge-admin' : 'badge-vendedora'"
+        >
+          <IconoLucide :nombre="authStore.esAdmin ? 'ShieldCheck' : 'Eye'" :tamano="14" />
+          <span>{{ authStore.esAdmin ? 'Permiso Total: Administradora' : 'Solo Consulta: Personal de Tienda' }}</span>
+        </span>
+
+        <!-- Botón de Alta (Solo Dueña) -->
+        <BotonPrincipal v-if="authStore.esAdmin" @click="abrirAlta">
+          <template #iconoIzquierda>
+            <IconoLucide nombre="Plus" :tamano="18" />
+          </template>
+          <span>Nueva Joya</span>
+        </BotonPrincipal>
+      </div>
     </header>
 
     <!-- Barra de Búsqueda y Filtros de Inventario -->
@@ -79,19 +153,20 @@ const ejecutarTraslado = () => {
       <div class="buscador-ancho">
         <Buscador
           v-model="inventarioStore.busqueda"
-          placeholder="Buscar joya por nombre o categoría..."
+          placeholder="Buscar joya por nombre, material o categoría..."
         />
       </div>
     </div>
 
-    <!-- Tabla Principal de Existencias -->
+    <!-- Tabla Principal de Existencias con Control de Permisos -->
     <TablaInventario
       :items="inventarioStore.itemsFiltrados"
+      :es-admin="authStore.esAdmin"
       @mover-stock="abrirTraslado"
-      @editar="(joya) => alert(`Modo edición para: ${joya.nombre}`)"
+      @editar="abrirEdicion"
     />
 
-    <!-- Modal 1: Alta de Joya -->
+    <!-- Modal 1: Alta de Joya (Solo Dueña) -->
     <ModalBase
       :visible="modalAltaVisible"
       titulo="Registrar Nueva Joya en Inventario"
@@ -99,12 +174,29 @@ const ejecutarTraslado = () => {
       @cerrar="modalAltaVisible = false"
     >
       <FormProducto
+        modo="crear"
         @guardar="guardarNuevaJoya"
         @cancelar="modalAltaVisible = false"
       />
     </ModalBase>
 
-    <!-- Modal 2: Traslado Rápido entre Sedes -->
+    <!-- Modal 2: Edición Completa de Joya (Solo Dueña) -->
+    <ModalBase
+      :visible="modalEdicionVisible"
+      :titulo="`Editar Joya: ${joyaEnEdicion?.nombre || ''}`"
+      ancho-maximo="560px"
+      @cerrar="modalEdicionVisible = false"
+    >
+      <FormProducto
+        v-if="joyaEnEdicion"
+        modo="editar"
+        :producto-inicial="joyaEnEdicion"
+        @guardar="guardarEdicionJoya"
+        @cancelar="modalEdicionVisible = false"
+      />
+    </ModalBase>
+
+    <!-- Modal 3: Traslado Rápido entre Sedes (Solo Dueña) -->
     <ModalBase
       :visible="modalTrasladoVisible"
       :titulo="`Trasladar Stock: ${joyaSeleccionada?.nombre || ''}`"
@@ -173,6 +265,17 @@ const ejecutarTraslado = () => {
         </div>
       </div>
     </ModalBase>
+
+    <!-- Modal 4: Modal de Alerta y Errores de Inventario -->
+    <ModalAlerta
+      :visible="modalErrorVisible"
+      tipo="error"
+      :titulo="modalErrorTitulo"
+      :mensaje="modalErrorMensaje"
+      :detalles="modalErrorDetalles"
+      texto-boton="Entendido"
+      @cerrar="modalErrorVisible = false"
+    />
   </div>
 </template>
 
@@ -193,13 +296,42 @@ const ejecutarTraslado = () => {
 
 .titulo-vista {
   font-size: var(--tamano-h1-escritorio);
-  font-weight: 700;
-  color: var(--color-neutral-900);
+  font-weight: 800;
+  color: var(--color-primario);
 }
 
 .subtitulo-vista {
   font-size: var(--tamano-cuerpo);
   color: var(--color-neutral-600);
+}
+
+.acciones-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.badge-permiso {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radio-md);
+}
+
+.badge-permiso.badge-admin {
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
+  border: 1px solid rgba(62, 18, 24, 0.2);
+}
+
+.badge-permiso.badge-vendedora {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-600);
+  border: 1px solid var(--color-neutral-200);
 }
 
 .barra-herramientas {
@@ -239,13 +371,13 @@ const ejecutarTraslado = () => {
 .etiqueta-sede {
   font-size: 11px;
   color: var(--color-neutral-600);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .cifra-sede {
   font-size: 18px;
-  font-weight: 700;
-  color: var(--color-neutral-900);
+  font-weight: 800;
+  color: var(--color-primario);
 }
 
 .flecha-indicadora {
@@ -260,7 +392,7 @@ const ejecutarTraslado = () => {
 
 .etiqueta-campo {
   font-size: var(--tamano-cuerpo);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-neutral-900);
 }
 
@@ -279,7 +411,7 @@ const ejecutarTraslado = () => {
 
 .control-select:focus,
 .input-control:focus {
-  border-color: var(--color-neutral-900);
+  border-color: var(--color-primario);
 }
 
 .ayuda-stock {
