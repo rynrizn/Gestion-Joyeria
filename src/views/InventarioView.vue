@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useInventarioStore } from '../stores/inventario'
 import { useProductosStore } from '../stores/productos'
 import { useAuthStore } from '../stores/auth'
@@ -14,6 +14,10 @@ import IconoLucide from '../components/common/IconoLucide.vue'
 const inventarioStore = useInventarioStore()
 const productosStore = useProductosStore()
 const authStore = useAuthStore()
+
+const categoriasParaFiltro = computed(() => {
+  return productosStore.categorias.filter((c) => c !== 'TODOS')
+})
 
 // Modales
 const modalAltaVisible = ref(false)
@@ -155,6 +159,30 @@ const ejecutarTraslado = () => {
           v-model="inventarioStore.busqueda"
           placeholder="Buscar producto por nombre, material o categoría..."
         />
+      </div>
+
+      <!-- Filtro por Categoría -->
+      <div class="selector-filtro">
+        <select v-model="inventarioStore.filtroCategoria" class="control-select-filtro">
+          <option value="TODAS">Todas las categorías</option>
+          <option
+            v-for="cat in categoriasParaFiltro"
+            :key="cat"
+            :value="cat"
+          >
+            {{ cat }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Selector de Ordenamiento -->
+      <div class="selector-filtro">
+        <select v-model="inventarioStore.ordenSeleccionado" class="control-select-filtro">
+          <option value="az">Orden: Nombre (A - Z)</option>
+          <option value="za">Orden: Nombre (Z - A)</option>
+          <option value="precio_desc">Orden: Precio (Mayor a Menor)</option>
+          <option value="precio_asc">Orden: Precio (Menor a Mayor)</option>
+        </select>
       </div>
     </div>
 
@@ -337,12 +365,34 @@ const ejecutarTraslado = () => {
 .barra-herramientas {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .buscador-ancho {
+  flex: 1;
+  min-width: 260px;
+}
+
+.selector-filtro {
+  min-width: 190px;
+}
+
+.control-select-filtro {
   width: 100%;
-  max-width: 480px;
+  padding: 10px 14px;
+  background-color: var(--color-blanco);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radio-md);
+  font-size: var(--tamano-cuerpo);
+  color: var(--color-neutral-900);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transicion-rapida);
+}
+
+.control-select-filtro:focus {
+  border-color: var(--color-primario);
 }
 
 /* Modal de Traslado */
