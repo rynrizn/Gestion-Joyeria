@@ -9,10 +9,10 @@ const RESERVAS_DEFECTO = [
     cliente: 'María López',
     telefono: '71234567',
     tipoCliente: 'HABITUAL',
-    producto: 'Anillo Serpiente Regulable',
+    producto: 'Aros Mini Serpiente Regulable',
     idProducto: 1,
     items: [
-      { id: 1, nombre: 'Anillo Serpiente Regulable', cantidad: 1, precio: 45 },
+      { id: 1, nombre: 'Aros Mini Serpiente Regulable', cantidad: 1, precio: 45 },
     ],
     cantidad: 1,
     montoTotal: 45,
@@ -28,13 +28,14 @@ const RESERVAS_DEFECTO = [
     cliente: 'Ana García',
     telefono: '72345678',
     tipoCliente: 'NUEVA',
-    producto: 'Collar Luna Moonstone',
+    producto: 'Earcuff Luna Moonstone (x1), Aros Mini Doble Brillo (x1)',
     idProducto: 2,
     items: [
-      { id: 2, nombre: 'Collar Luna Moonstone', cantidad: 1, precio: 85 },
+      { id: 2, nombre: 'Earcuff Luna Moonstone', cantidad: 1, precio: 85 },
+      { id: 3, nombre: 'Aros Mini Doble Brillo', cantidad: 1, precio: 35 },
     ],
-    cantidad: 1,
-    montoTotal: 85,
+    cantidad: 2,
+    montoTotal: 120,
     vencimiento: 'Quedan 12h',
     fechaLimiteMs: Date.now() + 12 * 3600 * 1000,
     estado: 'PENDIENTE',
@@ -61,7 +62,132 @@ const RESERVAS_DEFECTO = [
     origen: 'TIENDA',
     fecha: '2026-09-25 18:00',
   },
+  {
+    id: 4,
+    cliente: 'Camila Suárez',
+    telefono: '75678901',
+    tipoCliente: 'HABITUAL',
+    producto: 'Aros Mini Doble Brillo (x1), Brazalete Eslabón Trenza (x1)',
+    idProducto: 3,
+    items: [
+      { id: 3, nombre: 'Aros Mini Doble Brillo', cantidad: 1, precio: 35 },
+      { id: 5, nombre: 'Brazalete Eslabón Trenza', cantidad: 1, precio: 60 },
+    ],
+    cantidad: 2,
+    montoTotal: 95,
+    vencimiento: 'Quedan 20h',
+    fechaLimiteMs: Date.now() + 20 * 3600 * 1000,
+    estado: 'PENDIENTE',
+    esUrgente: false,
+    origen: 'WHATSAPP',
+    fecha: '2026-09-26 09:40',
+  },
 ]
+
+/**
+ * Calcula la disponibilidad del pedido entre Stock Central y Stock Tienda.
+ * Retorna estado, etiqueta descriptiva y estilo visual para la tabla y modal.
+ */
+export const calcularDisponibilidadPedido = (reserva, inventarioProductos = []) => {
+  const items = reserva?.items || []
+  if (items.length === 0) {
+    return {
+      tipo: 'insuficiente',
+      texto: 'Sin piezas',
+      badge: 'Sin piezas',
+      clase: 'disp-insuficiente',
+      icono: 'AlertTriangle',
+    }
+  }
+
+  let todosEnTienda = true
+  let todosEnCentral = true
+  let alcanzableCombinado = true
+
+  for (const it of items) {
+    const prod = inventarioProductos.find((p) => p.id === it.id)
+    const stockTienda = prod ? Number(prod.stockTienda || 0) : 0
+    const stockCentral = prod ? Number(prod.stockCentral || 0) : 0
+    const cant = Number(it.cantidad || 1)
+
+    if (stockTienda < cant) {
+      todosEnTienda = false
+    }
+    if (stockCentral < cant) {
+      todosEnCentral = false
+    }
+    if ((stockTienda + stockCentral) < cant) {
+      alcanzableCombinado = false
+    }
+  }
+
+  if (todosEnTienda) {
+    return {
+      tipo: 'tienda',
+      texto: 'En Tienda',
+      badge: 'En Tienda',
+      clase: 'disp-tienda',
+      icono: 'Store',
+      descripcion: 'Disponible para entrega inmediata en mostrador',
+    }
+  } else if (todosEnCentral) {
+    return {
+      tipo: 'central',
+      texto: 'En Central',
+      badge: 'En Central',
+      clase: 'disp-central',
+      icono: 'Building2',
+      descripcion: 'Existencias ubicadas en almacén Central',
+    }
+  } else if (alcanzableCombinado) {
+    return {
+      tipo: 'ambas',
+      texto: 'Ambas Sedes',
+      badge: 'Ambas Sedes',
+      clase: 'disp-ambas',
+      icono: 'Layers',
+      descripcion: 'Piezas distribuidas entre Central y Tienda física',
+    }
+  } else {
+    return {
+      tipo: 'insuficiente',
+      texto: 'Stock Insuficiente',
+      badge: 'Stock Insuficiente',
+      clase: 'disp-insuficiente',
+      icono: 'AlertCircle',
+      descripcion: 'No hay unidades suficientes para cubrir la reserva',
+    }
+  }
+}
+
+/**
+ * Enriquece los items de una reserva con los datos en tiempo real del inventario
+ * (fotos, talla, color, material, y stock en Central y Tienda).
+ */
+export const enriquecerItemsReserva = (reserva, inventarioProductos = []) => {
+  const items = reserva?.items || []
+  return items.map((it) => {
+    const prod = inventarioProductos.find((p) => p.id === it.id)
+    const precioUnit = Number(it.precio || prod?.precio || prod?.precio_venta || 0)
+    const cant = Number(it.cantidad || 1)
+
+    return {
+      id: it.id,
+      nombre: it.nombre || prod?.nombre || 'Producto sin nombre',
+      categoria: prod?.categoria || 'Joyas',
+      material: prod?.material || 'Acero 316L',
+      color: prod?.color || 'Plateado',
+      talla: prod?.talla || 'Ajustable',
+      imagen: prod?.imagen || it.imagen || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
+      stockCentral: prod ? Number(prod.stockCentral || 0) : 0,
+      stockTienda: prod ? Number(prod.stockTienda || 0) : 0,
+      stockTotal: prod ? (Number(prod.stockCentral || 0) + Number(prod.stockTienda || 0)) : 0,
+      cantidad: cant,
+      precioUnitario: precioUnit,
+      subtotal: precioUnit * cant,
+    }
+  })
+}
 
 export const useReservasStore = defineStore('reservas', () => {
   const cargarInicial = () => {
@@ -148,6 +274,11 @@ export const useReservasStore = defineStore('reservas', () => {
       nombre: item.producto.nombre,
       cantidad: item.cantidad,
       precio: Number(item.producto.precio_venta || item.producto.precio || 0),
+      imagen: item.producto.imagen || '',
+      categoria: item.producto.categoria || '',
+      material: item.producto.material || '',
+      color: item.producto.color || '',
+      talla: item.producto.talla || '',
     }))
 
     const descripcionProductos = itemsReserva
@@ -226,5 +357,7 @@ export const useReservasStore = defineStore('reservas', () => {
     limpiarReservaActiva,
     crearReservaDesdeCarrito,
     crearReserva,
+    calcularDisponibilidadPedido,
+    enriquecerItemsReserva,
   }
 })
