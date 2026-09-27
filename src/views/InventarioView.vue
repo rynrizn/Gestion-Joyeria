@@ -143,7 +143,7 @@ const ejecutarTraslado = () => {
           <template #iconoIzquierda>
             <IconoLucide nombre="Plus" :tamano="18" />
           </template>
-          <span>Nueva Joya</span>
+          <span>Nuevo Producto</span>
         </BotonPrincipal>
       </div>
     </header>
@@ -153,7 +153,7 @@ const ejecutarTraslado = () => {
       <div class="buscador-ancho">
         <Buscador
           v-model="inventarioStore.busqueda"
-          placeholder="Buscar joya por nombre, material o categoría..."
+          placeholder="Buscar producto por nombre, material o categoría..."
         />
       </div>
     </div>
@@ -166,10 +166,10 @@ const ejecutarTraslado = () => {
       @editar="abrirEdicion"
     />
 
-    <!-- Modal 1: Alta de Joya (Solo Dueña) -->
+    <!-- Modal 1: Alta de Producto (Solo Dueña) -->
     <ModalBase
       :visible="modalAltaVisible"
-      titulo="Registrar Nueva Joya en Inventario"
+      titulo="Registrar Nuevo Producto en Inventario"
       ancho-maximo="560px"
       @cerrar="modalAltaVisible = false"
     >
@@ -180,10 +180,10 @@ const ejecutarTraslado = () => {
       />
     </ModalBase>
 
-    <!-- Modal 2: Edición Completa de Joya (Solo Dueña) -->
+    <!-- Modal 2: Edición Completa de Producto (Solo Dueña) -->
     <ModalBase
       :visible="modalEdicionVisible"
-      :titulo="`Editar Joya: ${joyaEnEdicion?.nombre || ''}`"
+      :titulo="`Editar Producto: ${joyaEnEdicion?.nombre || ''}`"
       ancho-maximo="560px"
       @cerrar="modalEdicionVisible = false"
     >
