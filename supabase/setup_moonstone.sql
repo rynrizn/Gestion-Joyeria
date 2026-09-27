@@ -48,13 +48,6 @@ VALUES
     ('COLLARES', TRUE)
 ON CONFLICT (nombre) DO NOTHING;
 
--- Usuaria Administradora (id_usuario = 1)
-INSERT INTO public.usuario (id_usuario, nombre, nombre_usuario, password_hash, activo, id_rol)
-OVERRIDING SYSTEM VALUE
-VALUES 
-    (1, 'Belen', 'admin', 'pbkdf2_sha256$placeholder_hash', TRUE, 1)
-ON CONFLICT (nombre_usuario) DO NOTHING;
-
 -- Sincronizar secuencias
 SELECT setval(pg_get_serial_sequence('public.rol', 'id_rol'), COALESCE((SELECT MAX(id_rol) FROM public.rol), 1));
 SELECT setval(pg_get_serial_sequence('public.ubicacion', 'id_ubicacion'), COALESCE((SELECT MAX(id_ubicacion) FROM public.ubicacion), 1));
