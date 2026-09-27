@@ -37,30 +37,43 @@ import IconoLucide from './IconoLucide.vue'
         </a>
       </div>
 
-      <!-- Columna 3: Atención y WhatsApp -->
+      <!-- Columna 3: Atención y Redes Sociales -->
       <div class="bloque-contacto">
         <h4 class="titulo-seccion-footer">
           <IconoLucide nombre="MessageCircle" :tamano="16" />
-          <span>Atención & Pedidos</span>
+          <span>Contacto & Pedidos</span>
         </h4>
-        <p class="texto-atencion">Coordina apartados o consultas directas con nosotras:</p>
+        <p class="texto-atencion">Coordina apartados o síguenos en redes oficiales:</p>
         
-        <a
-          :href="`https://wa.me/${CONFIG_NEGOCIO.whatsappNumero}`"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="boton-whatsapp-footer"
-        >
-          <IconoLucide nombre="MessageCircle" :tamano="16" />
-          <span>WhatsApp: {{ CONFIG_NEGOCIO.whatsappDisplay }}</span>
-        </a>
+        <div class="botones-contacto-footer">
+          <a
+            :href="`https://wa.me/${CONFIG_NEGOCIO.whatsappNumero}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="boton-whatsapp-footer"
+            title="Escribir al WhatsApp oficial"
+          >
+            <IconoLucide nombre="MessageCircle" :tamano="16" />
+            <span>WhatsApp: {{ CONFIG_NEGOCIO.whatsappDisplay }}</span>
+          </a>
+
+          <a
+            :href="CONFIG_NEGOCIO.instagramUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="boton-instagram-footer"
+            title="Visitar Instagram oficial de Moonstone"
+          >
+            <IconoLucide nombre="Instagram" :tamano="16" />
+            <span>Instagram: {{ CONFIG_NEGOCIO.instagramDisplay }}</span>
+          </a>
+        </div>
       </div>
     </div>
 
     <div class="barra-derechos">
       <div class="contenedor fila-derechos">
         <span>&copy; {{ new Date().getFullYear() }} Moonstone Joyería &bull; Todos los derechos reservados.</span>
-        <span class="ubicacion-mini">{{ CONFIG_NEGOCIO.ubicacionTexto }}</span>
       </div>
     </div>
   </footer>
@@ -177,6 +190,13 @@ import IconoLucide from './IconoLucide.vue'
   margin-bottom: 4px;
 }
 
+.botones-contacto-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .boton-whatsapp-footer {
   display: inline-flex;
   align-items: center;
@@ -193,6 +213,26 @@ import IconoLucide from './IconoLucide.vue'
 }
 
 .boton-whatsapp-footer:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.boton-instagram-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+  color: #ffffff;
+  border-radius: var(--radio-md);
+  font-size: 13px;
+  font-weight: 700;
+  width: fit-content;
+  box-shadow: var(--sombra-sutil);
+  transition: transform var(--transicion-rapida), opacity var(--transicion-rapida);
+}
+
+.boton-instagram-footer:hover {
   opacity: 0.95;
   transform: translateY(-1px);
 }

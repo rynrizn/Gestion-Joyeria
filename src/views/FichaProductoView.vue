@@ -94,7 +94,7 @@ const agregarAlCarrito = () => {
           <!-- Precio Destacado -->
           <div class="bloque-precio">
             <span class="precio-texto">Bs. {{ joya.precio_venta }}</span>
-            <span class="iva-incluido">Precio final</span>
+            <span class="iva-incluido">Precio</span>
           </div>
 
           <!-- Indicador de Disponibilidad de Stock Físico -->
