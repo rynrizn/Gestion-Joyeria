@@ -112,7 +112,7 @@ const procesarLogin = async () => {
           v-model="identificador"
           etiqueta="Correo electrónico o usuario"
           tipo="text"
-          placeholder="ej. duena@moonstone.com o duena"
+          placeholder="Correo electrónico o usuario"
           :deshabilitado="authStore.estaBloqueado"
           requerido
         >

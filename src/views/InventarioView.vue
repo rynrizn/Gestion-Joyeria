@@ -40,7 +40,7 @@ const destinoTraslado = ref('tienda')
 const abrirAlta = () => {
   if (!authStore.esAdmin) {
     modalErrorTitulo.value = 'Permiso Denegado'
-    modalErrorMensaje.value = 'Solo la Administradora (Dueña) tiene autorización para dar de alta nuevas joyas en el inventario.'
+    modalErrorMensaje.value = 'Solo la Administradora tiene autorización para dar de alta nuevos productos en el inventario.'
     modalErrorDetalles.value = ''
     modalErrorVisible.value = true
     return
@@ -51,7 +51,7 @@ const abrirAlta = () => {
 const abrirEdicion = (joya) => {
   if (!authStore.esAdmin) {
     modalErrorTitulo.value = 'Permiso Denegado'
-    modalErrorMensaje.value = 'Solo la Administradora (Dueña) tiene autorización para editar los datos o precios de las joyas.'
+    modalErrorMensaje.value = 'Solo la Administradora tiene autorización para editar los datos o precios de los productos.'
     modalErrorDetalles.value = ''
     modalErrorVisible.value = true
     return
@@ -63,7 +63,7 @@ const abrirEdicion = (joya) => {
 const abrirTraslado = (joya) => {
   if (!authStore.esAdmin) {
     modalErrorTitulo.value = 'Permiso Denegado'
-    modalErrorMensaje.value = 'Solo la Administradora (Dueña) puede autorizar y realizar traslados de stock entre sedes.'
+    modalErrorMensaje.value = 'Solo la Administradora puede autorizar y realizar traslados de stock entre sedes.'
     modalErrorDetalles.value = ''
     modalErrorVisible.value = true
     return
@@ -98,7 +98,7 @@ const ejecutarTraslado = () => {
   if (Number(cantidadTraslado.value) > stockDisponible) {
     modalErrorTitulo.value = 'Stock Insuficiente en Origen'
     modalErrorMensaje.value = `No es posible trasladar ${cantidadTraslado.value} unidades. La sede de origen solo dispone de ${stockDisponible} unidad(es).`
-    modalErrorDetalles.value = `Origen: ${origenTraslado.value === 'central' ? 'Central (Dueña)' : 'Tienda (Mercadito Creativo)'}`
+    modalErrorDetalles.value = `Origen: ${origenTraslado.value === 'central' ? 'Stock Central' : 'Tienda (Mercadito Creativo)'}`
     modalErrorVisible.value = true
     return
   }
@@ -128,7 +128,7 @@ const ejecutarTraslado = () => {
       <div>
         <h1 class="titulo-vista">Inventario Multisede</h1>
         <p class="subtitulo-vista">
-          Control de existencias entre Central (Dueña) y Tienda Física (Mercadito Creativo)
+          Control de existencias entre Stock Central y Tienda Física (Mercadito Creativo)
         </p>
       </div>
 
@@ -235,7 +235,7 @@ const ejecutarTraslado = () => {
         <!-- Resumen de existencias actuales -->
         <div class="resumen-sedes">
           <div class="caja-sede">
-            <span class="etiqueta-sede">Stock Central (Dueña)</span>
+            <span class="etiqueta-sede">Stock Central</span>
             <span class="cifra-sede">{{ joyaSeleccionada.stockCentral }} u.</span>
           </div>
           <div class="flecha-indicadora">
@@ -255,8 +255,8 @@ const ejecutarTraslado = () => {
             class="control-select"
             @change="destinoTraslado = origenTraslado === 'central' ? 'tienda' : 'central'"
           >
-            <option value="central">De Central (Dueña) ➔ Hacia Tienda (Mercadito Creativo)</option>
-            <option value="tienda">De Tienda (Mercadito Creativo) ➔ Hacia Central (Dueña)</option>
+            <option value="central">De Stock Central ➔ Hacia Tienda (Mercadito Creativo)</option>
+            <option value="tienda">De Tienda (Mercadito Creativo) ➔ Hacia Stock Central</option>
           </select>
         </div>
 

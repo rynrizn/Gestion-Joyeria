@@ -115,7 +115,7 @@ const guardarNuevoCliente = () => {
 const abrirModalEdicionCliente = (cliente) => {
   if (!authStore.esAdmin) {
     modalErrorTitulo.value = 'Permiso Denegado'
-    modalErrorMensaje.value = 'Solo la Administradora (Dueña) tiene autorización para modificar la información de las clientas.'
+    modalErrorMensaje.value = 'Solo la Administradora tiene autorización para modificar la información de las clientas.'
     modalErrorDetalles.value = ''
     modalErrorVisible.value = true
     return

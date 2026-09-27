@@ -240,7 +240,7 @@ const procesarRegistroVenta = () => {
   }
 
   // 3. Registrar venta en el store de ventas con registro implícito de la vendedora en turno
-  const vendedoraNombre = authStore.usuario?.nombre || (authStore.esAdmin ? 'Dueña del Negocio' : 'Personal de Tienda')
+  const vendedoraNombre = authStore.usuario?.nombre || (authStore.esAdmin ? 'Belen' : 'Personal de Tienda')
   const idVendedora = authStore.usuario?.id || 1
 
   const ventaRegistrada = ventasStore.registrarVenta({
@@ -294,8 +294,8 @@ const procesarRegistroVenta = () => {
       <div class="badge-vendedora-turno">
         <IconoLucide nombre="ShieldCheck" :tamano="16" />
         <span>
-          Responsable: <strong>{{ authStore.esAdmin ? 'Dueña (Admin)' : 'Personal de Tienda' }}</strong>
-          &bull; {{ ventasStore.turnoActual }}
+          Responsable: <strong>{{ authStore.esAdmin ? 'Belen' : (authStore.usuario?.nombre || 'Personal de Tienda') }}</strong>
+          &bull; {{ authStore.rolVisual }} &bull; {{ ventasStore.turnoActual }}
         </span>
       </div>
     </header>
