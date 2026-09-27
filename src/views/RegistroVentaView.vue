@@ -71,10 +71,18 @@ const obtenerStockMaximoItem = (item) => {
 const alCambiarOrigenStock = (item) => {
   const max = obtenerStockMaximoItem(item)
   if (max <= 0) {
+    const totalAmbas = Number(item.stockTienda || 0) + Number(item.stockCentral || 0)
     modalErrorTitulo.value = 'Sin Stock en Ubicación Seleccionada'
-    modalErrorMensaje.value = `No hay existencias disponibles de "${item.nombre}" en la opción elegida.`
-    modalErrorDetalles.value = 'Por favor selecciona otra sede o elige "Ambas Sedes".'
+    modalErrorMensaje.value = `No hay existencias disponibles de "${item.nombre}" en la sede elegida.`
+    modalErrorDetalles.value = totalAmbas > 0
+      ? 'Se seleccionó automáticamente "Ambas Sedes" para disponer del stock existente.'
+      : 'Esta joya se encuentra agotada en ambas sedes.'
     modalErrorVisible.value = true
+
+    if (totalAmbas > 0) {
+      item.origenStock = 'ambos'
+      item.cantidad = Math.min(item.cantidad || 1, totalAmbas)
+    }
     return
   }
   if (item.cantidad > max) {
@@ -287,6 +295,18 @@ const procesarRegistroVenta = () => {
     modalErrorDetalles.value = 'Usa el buscador superior para agregar productos.'
     modalErrorVisible.value = true
     return
+  }
+
+  // 1.5. Validar que cada pieza del ticket cuente con existencias en el origen elegido
+  for (const it of itemsVenta.value) {
+    const max = obtenerStockMaximoItem(it)
+    if (max <= 0 || it.cantidad > max) {
+      modalErrorTitulo.value = 'Stock Insuficiente en Ticket'
+      modalErrorMensaje.value = `La joya "${it.nombre}" requiere ${it.cantidad} unidad(es), pero solo hay ${max} disponibles en la ubicación elegida.`
+      modalErrorDetalles.value = 'Por favor ajusta la cantidad o selecciona "Ambas Sedes" para utilizar existencias combinadas.'
+      modalErrorVisible.value = true
+      return
+    }
   }
 
   // 2. Validar método de pago híbrido
