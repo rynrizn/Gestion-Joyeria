@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 
 const CLAVE_RESERVAS = 'moonstone_reservas'
 
@@ -228,12 +229,61 @@ export const useReservasStore = defineStore('reservas', () => {
     }).length
   })
 
+  // Carga asíncrona desde Supabase (tabla reserva)
+  const cargarReservasSupabase = async () => {
+    if (!isSupabaseConfigured) return false
+    try {
+      const { data, error } = await supabase
+        .from('reserva')
+        .select('*')
+        .order('fecha_limite', { ascending: true })
+
+      if (!error && data && data.length > 0) {
+        reservas.value = data.map((r) => {
+          const fechaLimiteMs = r.fecha_limite ? new Date(r.fecha_limite).getTime() : (Date.now() + 24 * 3600 * 1000)
+          const horasRestantes = Math.max(0, Math.round((fechaLimiteMs - Date.now()) / (3600 * 1000)))
+          return {
+            id: r.id_reserva || r.id,
+            cliente: r.cliente || r.nombre_cliente || 'Cliente Web',
+            telefono: r.telefono || '',
+            tipoCliente: r.tipo_cliente || 'NUEVA',
+            producto: r.descripcion_items || r.producto || 'Joyas Reservadas',
+            idProducto: r.id_producto || null,
+            items: Array.isArray(r.items) ? r.items : [],
+            cantidad: Number(r.cantidad || 1),
+            montoTotal: Number(r.monto_total || r.total || 0),
+            vencimiento: `Quedan ${horasRestantes}h`,
+            fechaLimiteMs,
+            estado: r.estado || 'PENDIENTE',
+            esUrgente: horasRestantes <= 4,
+            origen: r.origen || 'WHATSAPP',
+            fecha: r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' '),
+          }
+        })
+        guardarEnStorage()
+        return true
+      }
+    } catch (err) {
+      console.warn('ℹ️ [Supabase] Usando almacenamiento local para reservas:', err.message)
+    }
+    return false
+  }
+
   // Cobrar reserva y marcar como entregada
   const cobrarReserva = (idReserva) => {
     const res = reservas.value.find((r) => r.id === idReserva)
     if (res) {
       res.estado = 'ENTREGADA'
       guardarEnStorage()
+
+      if (isSupabaseConfigured) {
+        supabase
+          .from('reserva')
+          .update({ estado: 'ENTREGADA' })
+          .eq('id_reserva', idReserva)
+          .then()
+          .catch((e) => console.warn('ℹ️ [Supabase Sync Reserva Entregada]:', e))
+      }
     }
   }
 
@@ -243,6 +293,16 @@ export const useReservasStore = defineStore('reservas', () => {
     if (res) {
       res.estado = 'CANCELADA'
       guardarEnStorage()
+
+      if (isSupabaseConfigured) {
+        supabase
+          .from('reserva')
+          .update({ estado: 'CANCELADA' })
+          .eq('id_reserva', idReserva)
+          .then()
+          .catch((e) => console.warn('ℹ️ [Supabase Sync Reserva Cancelada]:', e))
+      }
+
       return true
     }
     return false
@@ -307,6 +367,27 @@ export const useReservasStore = defineStore('reservas', () => {
 
     reservas.value.unshift(nuevaReserva)
     guardarEnStorage()
+
+    // Sincronización en segundo plano con Supabase si está activo
+    if (isSupabaseConfigured) {
+      supabase.rpc('crear_reserva', {
+        p_cliente: nuevaReserva.cliente,
+        p_telefono: nuevaReserva.telefono,
+        p_items: nuevaReserva.items,
+        p_horas_vigencia: 24,
+      }).then().catch(() => {
+        supabase.from('reserva').insert({
+          cliente: nuevaReserva.cliente,
+          telefono: nuevaReserva.telefono,
+          producto: nuevaReserva.producto,
+          monto_total: nuevaReserva.montoTotal,
+          fecha_limite: new Date(nuevaReserva.fechaLimiteMs).toISOString(),
+          estado: 'PENDIENTE',
+          origen: 'WHATSAPP',
+        }).then().catch((e) => console.warn('ℹ️ [Supabase Sync Reserva]:', e))
+      })
+    }
+
     return nuevaReserva
   }
 
@@ -343,6 +424,19 @@ export const useReservasStore = defineStore('reservas', () => {
 
     reservas.value.unshift(nueva)
     guardarEnStorage()
+
+    if (isSupabaseConfigured) {
+      supabase.from('reserva').insert({
+        cliente: nueva.cliente,
+        telefono: nueva.telefono,
+        producto: nueva.producto,
+        monto_total: nueva.montoTotal,
+        fecha_limite: new Date(nueva.fechaLimiteMs).toISOString(),
+        estado: 'PENDIENTE',
+        origen: 'TIENDA',
+      }).then().catch((e) => console.warn('ℹ️ [Supabase Sync Reserva Manual]:', e))
+    }
+
     return nueva
   }
 
@@ -351,6 +445,7 @@ export const useReservasStore = defineStore('reservas', () => {
     reservasPendientes,
     contadorPorVencer,
     reservaActivaParaVenta,
+    cargarReservasSupabase,
     cobrarReserva,
     liberarReserva,
     prepararVentaDesdeReserva,

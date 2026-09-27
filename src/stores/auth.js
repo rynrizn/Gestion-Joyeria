@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 
 const CLAVE_SESION = 'moonstone_usuario'
 const CLAVE_INTENTOS = 'moonstone_intentos_login'

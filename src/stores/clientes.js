@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 
 const CLAVE_CLIENTES = 'moonstone_clientes'
 
@@ -86,6 +87,47 @@ export const useClientesStore = defineStore('clientes', () => {
     }
   }
 
+  // Carga asíncrona desde Supabase (vista vw_historial_cliente o tabla cliente)
+  const cargarClientesSupabase = async () => {
+    if (!isSupabaseConfigured) return false
+    try {
+      const { data, error } = await supabase
+        .from('vw_historial_cliente')
+        .select('*')
+
+      let lista = data
+      if (error || !data) {
+        const { data: dataCli, error: errCli } = await supabase
+          .from('cliente')
+          .select('*')
+        if (errCli) throw errCli
+        lista = dataCli
+      }
+
+      if (lista && lista.length > 0) {
+        clientes.value = lista.map((c) => {
+          const compras = Number(c.cantidad_compras ?? c.cantidadCompras ?? 0)
+          const tel = c.telefono || c.contacto_telefono || ''
+          return {
+            id: c.id_cliente || c.id,
+            nombre: c.nombre,
+            telefono: tel,
+            contacto_telefono: tel,
+            ci: c.ci || c.documento_identidad || '',
+            cantidadCompras: compras,
+            tipo: calcularTipoCliente(compras),
+            ultimaVisita: c.ultima_compra ? c.ultima_compra.slice(0, 10) : (c.ultimaVisita || new Date().toISOString().slice(0, 10)),
+          }
+        })
+        guardarEnStorage()
+        return true
+      }
+    } catch (err) {
+      console.warn('ℹ️ [Supabase] Usando almacenamiento local para clientes:', err.message)
+    }
+    return false
+  }
+
   // Clientes filtrados por nombre, teléfono o CI
   const clientesFiltrados = computed(() => {
     const q = busqueda.value.toLowerCase().trim()
@@ -103,11 +145,12 @@ export const useClientesStore = defineStore('clientes', () => {
   const registrarCliente = (nuevo) => {
     const id = clientes.value.length ? Math.max(...clientes.value.map((c) => c.id)) + 1 : 1
     const compras = Number(nuevo.cantidadCompras || 0)
+    const tel = nuevo.telefono ? nuevo.telefono.trim() : (nuevo.contacto_telefono ? nuevo.contacto_telefono.trim() : '')
     const nuevoCliente = {
       id,
       nombre: nuevo.nombre.trim(),
-      telefono: nuevo.telefono ? nuevo.telefono.trim() : (nuevo.contacto_telefono ? nuevo.contacto_telefono.trim() : ''),
-      contacto_telefono: nuevo.telefono ? nuevo.telefono.trim() : (nuevo.contacto_telefono ? nuevo.contacto_telefono.trim() : ''),
+      telefono: tel,
+      contacto_telefono: tel,
       ci: nuevo.ci ? nuevo.ci.trim() : '',
       cantidadCompras: compras,
       tipo: calcularTipoCliente(compras),
@@ -115,6 +158,21 @@ export const useClientesStore = defineStore('clientes', () => {
     }
     clientes.value.unshift(nuevoCliente)
     guardarEnStorage()
+
+    // Sincronización en segundo plano con Supabase
+    if (isSupabaseConfigured) {
+      supabase
+        .from('cliente')
+        .insert({
+          nombre: nuevoCliente.nombre,
+          telefono: nuevoCliente.telefono,
+          ci: nuevoCliente.ci,
+          cantidad_compras: nuevoCliente.cantidadCompras,
+        })
+        .then()
+        .catch((e) => console.warn('ℹ️ [Supabase Sync Cliente]:', e))
+    }
+
     return nuevoCliente
   }
 
@@ -133,6 +191,22 @@ export const useClientesStore = defineStore('clientes', () => {
         c.tipo = calcularTipoCliente(c.cantidadCompras)
       }
       guardarEnStorage()
+
+      // Sincronización en segundo plano con Supabase
+      if (isSupabaseConfigured) {
+        supabase
+          .from('cliente')
+          .update({
+            nombre: c.nombre,
+            telefono: c.telefono,
+            ci: c.ci,
+            cantidad_compras: c.cantidadCompras,
+          })
+          .eq('id_cliente', c.id)
+          .then()
+          .catch((e) => console.warn('ℹ️ [Supabase Sync Update Cliente]:', e))
+      }
+
       return true
     }
     return false
@@ -146,6 +220,7 @@ export const useClientesStore = defineStore('clientes', () => {
     clientes,
     busqueda,
     clientesFiltrados,
+    cargarClientesSupabase,
     registrarCliente,
     actualizarCliente,
     obtenerPorId,

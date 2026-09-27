@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 
 const CLAVE_INVENTARIO = 'moonstone_inventario'
 
@@ -292,6 +293,50 @@ export const useInventarioStore = defineStore('inventario', () => {
     return true
   }
 
+  // Carga asíncrona desde Supabase (vista vw_inventario o tabla producto)
+  const cargarInventarioSupabase = async () => {
+    if (!isSupabaseConfigured) return false
+    try {
+      const { data, error } = await supabase
+        .from('vw_inventario')
+        .select('*')
+
+      let lista = data
+      if (error || !data) {
+        const { data: dataProd, error: errProd } = await supabase
+          .from('producto')
+          .select('*')
+        if (errProd) throw errProd
+        lista = dataProd
+      }
+
+      if (lista && lista.length > 0) {
+        items.value = lista.map((p) => ({
+          id: p.id_producto || p.id,
+          nombre: p.nombre,
+          categoria: (p.categoria || 'AROS MINI').toUpperCase(),
+          material: p.material || 'Acero 316L',
+          color: p.color || 'Plateado',
+          talla: p.talla || 'Estándar',
+          precio: Number(p.precio || p.precio_venta || 0),
+          stockCentral: Number(p.stock_central ?? p.stockCentral ?? p.stock_total ?? 0),
+          stockTienda: Number(p.stock_tienda ?? p.stockTienda ?? 0),
+          stock_minimo: Number(p.stock_minimo || 1),
+          stockMinimo: Number(p.stock_minimo || 1),
+          es_prioritario: Boolean(p.es_prioritario),
+          activo: p.activo !== undefined ? Boolean(p.activo) : true,
+          imagen: p.imagen || (Array.isArray(p.fotos) ? p.fotos[0] : p.fotos) || 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500&auto=format&fit=crop&q=80',
+          imagen_detalle: p.imagen_detalle || (Array.isArray(p.fotos) ? p.fotos[1] : '') || '',
+        }))
+        guardarEnStorage()
+        return true
+      }
+    } catch (err) {
+      console.warn('ℹ️ [Supabase] Usando almacenamiento local para inventario:', err.message)
+    }
+    return false
+  }
+
   return {
     items,
     busqueda,
@@ -301,6 +346,7 @@ export const useInventarioStore = defineStore('inventario', () => {
     alertasStockBajo,
     moverStock,
     descontarStockVenta,
+    cargarInventarioSupabase,
     agregarProducto,
     actualizarProducto,
   }

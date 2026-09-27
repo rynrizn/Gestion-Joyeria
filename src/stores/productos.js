@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 
 const CLAVE_PRODUCTOS = 'moonstone_productos'
 const CLAVE_CATEGORIAS = 'moonstone_categorias'
@@ -163,6 +164,7 @@ export const useProductosStore = defineStore('productos', () => {
   const productos = ref(cargarProductosInicial())
   const categoriaActiva = ref('TODOS')
   const busqueda = ref('')
+  const cargando = ref(false)
 
   const guardarCategoriasStorage = () => {
     try {
@@ -178,6 +180,57 @@ export const useProductosStore = defineStore('productos', () => {
     } catch (e) {
       console.error('Error guardando productos:', e)
     }
+  }
+
+  // Carga asíncrona desde Supabase (si está configurado)
+  const cargarProductosSupabase = async () => {
+    if (!isSupabaseConfigured) return false
+    cargando.value = true
+    try {
+      const { data, error } = await supabase
+        .from('vw_catalogo_publico')
+        .select('*')
+
+      let listaRecibida = data
+      if (error || !data) {
+        const { data: dataTabla, error: errTabla } = await supabase
+          .from('producto')
+          .select('*')
+        if (errTabla) throw errTabla
+        listaRecibida = dataTabla
+      }
+
+      if (listaRecibida && listaRecibida.length > 0) {
+        productos.value = listaRecibida.map((p) => ({
+          id: p.id_producto || p.id,
+          nombre: p.nombre,
+          categoria: (p.categoria || 'AROS MINI').toUpperCase(),
+          material: p.material || 'Acero 316L',
+          color: p.color || 'Plateado',
+          talla: p.talla || 'Estándar',
+          precio_venta: Number(p.precio || p.precio_venta || 0),
+          stock: Number(p.stock_total ?? p.stock ?? 0),
+          stockCentral: Number(p.stock_central ?? p.stockCentral ?? p.stock_total ?? 0),
+          stockTienda: Number(p.stock_tienda ?? p.stockTienda ?? 0),
+          stock_minimo: Number(p.stock_minimo || 1),
+          es_prioritario: Boolean(p.es_prioritario),
+          activo: p.activo !== undefined ? Boolean(p.activo) : true,
+          imagen: p.imagen || (Array.isArray(p.fotos) ? p.fotos[0] : p.fotos) || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
+          imagen_detalle: p.imagen_detalle || (Array.isArray(p.fotos) ? p.fotos[1] : '') || '',
+        }))
+
+        const cats = Array.from(new Set([...CATEGORIAS_BASE, ...productos.value.map((p) => p.categoria)]))
+        categorias.value = cats
+        guardarCategoriasStorage()
+        guardarProductosStorage()
+        return true
+      }
+    } catch (err) {
+      console.warn('ℹ️ [Supabase] Usando almacenamiento local para productos:', err.message)
+    } finally {
+      cargando.value = false
+    }
+    return false
   }
 
   // Filtrado reactivo para el catálogo público:
@@ -243,6 +296,29 @@ export const useProductosStore = defineStore('productos', () => {
       if (datos.imagen_detalle !== undefined) p.imagen_detalle = datos.imagen_detalle
 
       guardarProductosStorage()
+
+      // Sincronización en segundo plano con Supabase si está activo
+      if (isSupabaseConfigured) {
+        supabase
+          .from('producto')
+          .update({
+            nombre: p.nombre,
+            categoria: p.categoria,
+            material: p.material,
+            color: p.color,
+            talla: p.talla,
+            precio: p.precio_venta,
+            es_prioritario: p.es_prioritario,
+            activo: p.activo,
+            stock_minimo: p.stock_minimo,
+            imagen: p.imagen,
+            imagen_detalle: p.imagen_detalle,
+          })
+          .eq('id_producto', p.id)
+          .then()
+          .catch((e) => console.warn('ℹ️ [Supabase Sync Update]:', e))
+      }
+
       return true
     }
     return false
@@ -275,6 +351,28 @@ export const useProductosStore = defineStore('productos', () => {
     }
     productos.value.unshift(p)
     guardarProductosStorage()
+
+    // Inserción en Supabase en segundo plano si está activo
+    if (isSupabaseConfigured) {
+      supabase
+        .from('producto')
+        .insert({
+          nombre: p.nombre,
+          categoria: p.categoria,
+          material: p.material,
+          color: p.color,
+          talla: p.talla,
+          precio: p.precio_venta,
+          es_prioritario: p.es_prioritario,
+          activo: p.activo,
+          stock_minimo: p.stock_minimo,
+          imagen: p.imagen,
+          imagen_detalle: p.imagen_detalle,
+        })
+        .then()
+        .catch((e) => console.warn('ℹ️ [Supabase Sync Insert]:', e))
+    }
+
     return p
   }
 
@@ -283,7 +381,9 @@ export const useProductosStore = defineStore('productos', () => {
     categorias,
     categoriaActiva,
     busqueda,
+    cargando,
     productosFiltrados,
+    cargarProductosSupabase,
     agregarCategoria,
     obtenerPorId,
     actualizarProducto,
