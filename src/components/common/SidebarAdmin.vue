@@ -70,10 +70,10 @@ const cerrarSesion = () => {
         </div>
         <div class="datos-usuario">
           <span class="rol-principal">
-            {{ authStore.esAdmin ? 'Dueña (Admin)' : 'Personal de Tienda' }}
+            {{ authStore.esAdmin ? (authStore.usuario?.nombre || 'Belen') : (authStore.usuario?.nombre || 'Personal de Tienda') }}
           </span>
           <span class="turno-usuario">
-            {{ authStore.usuario?.turno || authStore.usuario?.email || 'Sesión Activa' }}
+            {{ authStore.esAdmin ? 'Administradora' : (authStore.usuario?.turno || 'Personal de Tienda') }}
           </span>
         </div>
         <button

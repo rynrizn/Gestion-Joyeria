@@ -12,7 +12,12 @@ export const useAuthStore = defineStore('auth', () => {
   const cargarSesionInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_SESION)
-      return guardado ? JSON.parse(guardado) : null
+      if (!guardado) return null
+      const parsed = JSON.parse(guardado)
+      if (parsed && parsed.rol === 'ADMINISTRADORA' && (!parsed.nombre || parsed.nombre === 'Dueña del Negocio')) {
+        parsed.nombre = 'Belen'
+      }
+      return parsed
     } catch {
       return null
     }
@@ -56,12 +61,12 @@ export const useAuthStore = defineStore('auth', () => {
   // Registros autorizados en Supabase (configuracion-supabase.txt)
   const USUARIOS_VALIDOS = [
     {
-      identificadores: ['duena@moonstone.com', 'duena'],
+      identificadores: ['belen', 'belen@moonstone.com', 'duena@moonstone.com', 'duena'],
       password: 'admin1234',
       datos: {
         id: 1,
-        nombre: 'Dueña del Negocio',
-        username: 'duena',
+        nombre: 'Belen',
+        username: 'belen',
         email: 'duena@moonstone.com',
         rol: 'ADMINISTRADORA',
         id_rol: 1,

@@ -256,7 +256,7 @@ const enviarFormulario = () => {
       <InputTexto
         v-model="stockInicial"
         tipo="number"
-        :etiqueta="modo === 'editar' ? 'Stock en Central (Dueña)' : 'Stock inicial (Central) *'"
+        :etiqueta="modo === 'editar' ? 'Stock en Central' : 'Stock inicial (Central) *'"
         placeholder="Ej. 5"
         requerido
       />

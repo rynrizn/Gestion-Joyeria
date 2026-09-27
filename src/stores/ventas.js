@@ -18,7 +18,7 @@ const VENTAS_INICIALES = [
     montoEfectivo: 90,
     montoQR: 0,
     cliente: 'Camila Morales',
-    vendedora: 'Dueña del Negocio',
+    vendedora: 'Belen',
     idVendedora: 1,
     turno: 'Turno Tarde',
     observacion: 'Clienta habitual',
