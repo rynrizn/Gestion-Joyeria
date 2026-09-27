@@ -1,11 +1,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useReservasStore } from '../stores/reservas'
+import { useReservasStore, calcularDisponibilidadPedido } from '../stores/reservas'
 import { useInventarioStore } from '../stores/inventario'
 import { useVentasStore } from '../stores/ventas'
 import TarjetaMetrica from '../components/admin/TarjetaMetrica.vue'
-import BadgeEstado from '../components/common/BadgeEstado.vue'
+import ModalDetallePedido from '../components/admin/ModalDetallePedido.vue'
 import ModalAlerta from '../components/common/ModalAlerta.vue'
 import IconoLucide from '../components/common/IconoLucide.vue'
 
@@ -14,17 +14,28 @@ const reservasStore = useReservasStore()
 const inventarioStore = useInventarioStore()
 const ventasStore = useVentasStore()
 
+// Estado para modal de detalle de pedido
+const modalDetalleVisible = ref(false)
+const reservaSeleccionadaParaDetalle = ref(null)
+
 // Estado para modal de confirmación al liberar reserva
 const modalLiberarVisible = ref(false)
 const reservaSeleccionadaParaLiberar = ref(null)
 
-// 1. Acción: Completar Venta (transfiere productos al POS)
-const completarVentaEnPOS = (reserva) => {
+// 1. Acción: Abrir modal de detalle con desglose de productos y ubicaciones
+const abrirDetallePedido = (reserva) => {
+  reservaSeleccionadaParaDetalle.value = reserva
+  modalDetalleVisible.value = true
+}
+
+// 2. Acción: Completar Venta desde el modal de detalle (transfiere productos al POS)
+const completarVentaDesdeModal = (reserva) => {
+  modalDetalleVisible.value = false
   reservasStore.prepararVentaDesdeReserva(reserva.id)
   router.push('/admin/ventas')
 }
 
-// 2. Acción: Solicitar confirmación para liberar reserva
+// 3. Acción: Solicitar confirmación para liberar reserva
 const solicitarLiberarReserva = (reserva) => {
   reservaSeleccionadaParaLiberar.value = reserva
   modalLiberarVisible.value = true
@@ -114,12 +125,10 @@ const contactarWhatsApp = (reserva) => {
         <table class="tabla-operativa">
           <thead>
             <tr>
-              <th>Origen / Clienta</th>
-              <th>Joya(s) Apartada(s)</th>
-              <th>Importe Total</th>
-              <th>Plazo Límite</th>
-              <th>Estado</th>
-              <th class="col-acciones">Acciones de Pedido</th>
+              <th>Fecha</th>
+              <th>Disponibilidad</th>
+              <th>Total de Venta</th>
+              <th class="col-acciones">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -128,75 +137,73 @@ const contactarWhatsApp = (reserva) => {
               :key="res.id"
               :class="{ 'fila-urgente': res.esUrgente }"
             >
-              <!-- Cliente y Origen -->
+              <!-- 1. Columna Fecha: Hora del pedido, tiempo que queda y titular -->
               <td>
-                <div class="celda-cliente">
-                  <div class="fila-origen-cliente">
+                <div class="celda-fecha-col">
+                  <div class="fila-plazo-urgencia">
+                    <span class="vencimiento-etiqueta" :class="{ urgente: res.esUrgente }">
+                      <IconoLucide nombre="Clock" :tamano="14" />
+                      <strong>{{ res.vencimiento }}</strong>
+                    </span>
+                    <span class="hora-creacion">{{ res.fecha }}</span>
+                  </div>
+
+                  <div class="titular-pedido-fila">
                     <span
                       class="badge-origen"
                       :class="res.origen === 'WHATSAPP' ? 'badge-whatsapp' : 'badge-tienda'"
                     >
                       <IconoLucide
                         :nombre="res.origen === 'WHATSAPP' ? 'MessageCircle' : 'Store'"
-                        :tamano="12"
+                        :tamano="11"
                       />
                       <span>{{ res.origen === 'WHATSAPP' ? 'WhatsApp' : 'Mostrador' }}</span>
                     </span>
-                    <span class="nombre-cliente">{{ res.cliente }}</span>
+                    <strong class="nombre-clienta-reserva">{{ res.cliente }}</strong>
                   </div>
-
-                  <button
-                    v-if="res.telefono"
-                    type="button"
-                    class="boton-whatsapp-mini"
-                    title="Escribir por WhatsApp"
-                    @click="contactarWhatsApp(res)"
-                  >
-                    <IconoLucide nombre="MessageCircle" :tamano="13" />
-                    <span>{{ res.telefono }}</span>
-                  </button>
                 </div>
               </td>
 
-              <!-- Joya(s) -->
+              <!-- 2. Columna Disponibilidad: Evaluación multisede (Central / Tienda / Ambas) -->
               <td>
-                <div class="celda-joyas">
-                  <span class="producto-nombre">{{ res.producto }}</span>
-                  <span class="cantidad-badge">{{ res.cantidad }} pieza{{ res.cantidad > 1 ? 's' : '' }}</span>
+                <div
+                  v-if="calcularDisponibilidadPedido(res, inventarioStore.productos)"
+                  class="badge-disponibilidad-tabla"
+                  :class="calcularDisponibilidadPedido(res, inventarioStore.productos).clase"
+                >
+                  <IconoLucide
+                    :nombre="calcularDisponibilidadPedido(res, inventarioStore.productos).icono"
+                    :tamano="14"
+                  />
+                  <span>{{ calcularDisponibilidadPedido(res, inventarioStore.productos).badge }}</span>
                 </div>
               </td>
 
-              <!-- Monto -->
-              <td class="monto-negrita">Bs. {{ res.montoTotal }}</td>
-
-              <!-- Vencimiento / Plazo de 24 horas -->
+              <!-- 3. Columna Total de Venta: Suma total de los productos solicitados -->
               <td>
-                <div class="bloque-vencimiento">
-                  <span class="vencimiento-etiqueta" :class="{ urgente: res.esUrgente }">
-                    <IconoLucide nombre="Clock" :tamano="14" />
-                    <strong>{{ res.vencimiento }}</strong>
+                <div class="celda-total-venta">
+                  <span class="monto-total-cifra">Bs. {{ res.montoTotal }}</span>
+                  <span class="piezas-conteo-sub">
+                    {{ res.cantidad }} pieza{{ res.cantidad > 1 ? 's' : '' }}
+                    <template v-if="(res.items || []).length > 1">
+                      &bull; {{ (res.items || []).length }} productos
+                    </template>
                   </span>
-                  <span class="fecha-creacion">Creado: {{ res.fecha }}</span>
                 </div>
               </td>
 
-              <!-- Estado -->
-              <td>
-                <BadgeEstado :estado="res.estado" />
-              </td>
-
-              <!-- Acciones Rápidas -->
+              <!-- 4. Columna Acciones: Botón Ver Detalle (reemplaza completar venta) y Remover -->
               <td class="col-acciones">
                 <div class="grupo-botones-accion">
-                  <!-- Botón 1: Completar Venta (transfiere al POS) -->
+                  <!-- Botón 1: Ver Detalle (Abre modal con desglose de productos y botón de completar venta) -->
                   <button
                     type="button"
-                    class="boton-accion completar"
-                    title="Transferir datos al formulario de venta para registrar cobro"
-                    @click="completarVentaEnPOS(res)"
+                    class="boton-accion ver-detalle"
+                    title="Ver lista de productos, stock en ubicaciones y procesar venta"
+                    @click="abrirDetallePedido(res)"
                   >
-                    <IconoLucide nombre="CheckCheck" :tamano="15" />
-                    <span>Completar Venta</span>
+                    <IconoLucide nombre="Eye" :tamano="15" />
+                    <span>Ver Detalle</span>
                   </button>
 
                   <!-- Botón 2: Remover / Liberar Reserva -->
@@ -215,7 +222,7 @@ const contactarWhatsApp = (reserva) => {
 
             <!-- Estado vacío -->
             <tr v-if="reservasStore.reservasPendientes.length === 0">
-              <td colspan="6" class="celda-vacia">
+              <td colspan="4" class="celda-vacia">
                 <div class="caja-vacia-dashboard">
                   <IconoLucide nombre="Inbox" :tamano="36" />
                   <p>No hay pedidos ni reservas pendientes en este momento.</p>
@@ -227,6 +234,16 @@ const contactarWhatsApp = (reserva) => {
         </table>
       </div>
     </section>
+
+    <!-- Modal de Detalle de Pedido (con desglose por ubicación y botón Completar Venta) -->
+    <ModalDetallePedido
+      :visible="modalDetalleVisible"
+      :reserva="reservaSeleccionadaParaDetalle"
+      :productos-inventario="inventarioStore.productos"
+      @cerrar="modalDetalleVisible = false"
+      @completar-venta="completarVentaDesdeModal"
+      @contactar-whatsapp="contactarWhatsApp"
+    />
 
     <!-- Modal de Confirmación para Remover Reserva -->
     <ModalAlerta
@@ -385,25 +402,42 @@ const contactarWhatsApp = (reserva) => {
   background-color: #FFFDF5;
 }
 
-.celda-cliente {
+.celda-fecha-col {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.fila-origen-cliente {
+.fila-plazo-urgencia {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.hora-creacion {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.titular-pedido-fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nombre-clienta-reserva {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
 .badge-origen {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
+  gap: 3px;
+  font-size: 9px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: var(--radio-sm);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -421,53 +455,58 @@ const contactarWhatsApp = (reserva) => {
   border: 1px solid var(--color-neutral-300);
 }
 
-.nombre-cliente {
-  font-weight: 700;
-  color: var(--color-neutral-900);
-}
-
-.boton-whatsapp-mini {
+/* Badge de Disponibilidad Multisede */
+.badge-disponibilidad-tabla {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: var(--color-whatsapp);
-  font-size: 12px;
-  font-weight: 600;
-  width: fit-content;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radio-sm);
+  white-space: nowrap;
 }
 
-.boton-whatsapp-mini:hover {
-  text-decoration: underline;
+.badge-disponibilidad-tabla.disp-tienda {
+  background-color: #E8F5E9;
+  color: #166534;
+  border: 1px solid #BBF7D0;
 }
 
-.celda-joyas {
+.badge-disponibilidad-tabla.disp-central {
+  background-color: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.badge-disponibilidad-tabla.disp-ambas {
+  background-color: #F3E8FF;
+  color: #6B21A8;
+  border: 1px solid #E9D5FF;
+}
+
+.badge-disponibilidad-tabla.disp-insuficiente {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+/* Celda Total de Venta */
+.celda-total-venta {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: 320px;
 }
 
-.producto-nombre {
-  font-weight: 600;
-  color: var(--color-neutral-900);
-  line-height: 1.35;
-}
-
-.cantidad-badge {
-  font-size: 11px;
-  color: var(--color-neutral-600);
-}
-
-.monto-negrita {
+.monto-total-cifra {
+  font-size: 16px;
   font-weight: 800;
   color: var(--color-primario);
-  font-size: 15px;
 }
 
-.bloque-vencimiento {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.piezas-conteo-sub {
+  font-size: 11px;
+  color: var(--color-neutral-600);
 }
 
 .vencimiento-etiqueta {
@@ -481,11 +520,6 @@ const contactarWhatsApp = (reserva) => {
 .vencimiento-etiqueta.urgente {
   color: var(--color-alerta);
   font-weight: 800;
-}
-
-.fecha-creacion {
-  font-size: 11px;
-  color: var(--color-neutral-600);
 }
 
 .col-acciones {
@@ -511,14 +545,15 @@ const contactarWhatsApp = (reserva) => {
   transition: all var(--transicion-rapida);
 }
 
-.boton-accion.completar {
+.boton-accion.ver-detalle {
   background-color: var(--color-primario);
   color: var(--color-blanco);
   border: 1px solid var(--color-primario);
 }
 
-.boton-accion.completar:hover {
-  background-color: var(--color-primario-hover);
+.boton-accion.ver-detalle:hover {
+  background-color: #2b0b11;
+  box-shadow: 0 2px 6px rgba(62, 18, 24, 0.2);
 }
 
 .boton-accion.liberar {
