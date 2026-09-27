@@ -267,6 +267,31 @@ export const useInventarioStore = defineStore('inventario', () => {
     return false
   }
 
+  // Descontar stock por venta de mostrador según origen ('tienda', 'central', 'ambos')
+  const descontarStockVenta = ({ idProducto, cantidad, origenStock = 'tienda' }) => {
+    const joya = items.value.find((i) => i.id === Number(idProducto))
+    if (!joya || cantidad <= 0) return false
+
+    if (origenStock === 'tienda') {
+      joya.stockTienda = Math.max(0, (joya.stockTienda || 0) - cantidad)
+    } else if (origenStock === 'central') {
+      joya.stockCentral = Math.max(0, (joya.stockCentral || 0) - cantidad)
+    } else if (origenStock === 'ambos') {
+      let restante = cantidad
+      const dispTienda = joya.stockTienda || 0
+      if (dispTienda >= restante) {
+        joya.stockTienda -= restante
+        restante = 0
+      } else {
+        joya.stockTienda = 0
+        restante -= dispTienda
+        joya.stockCentral = Math.max(0, (joya.stockCentral || 0) - restante)
+      }
+    }
+    guardarEnStorage()
+    return true
+  }
+
   return {
     items,
     busqueda,
@@ -275,6 +300,7 @@ export const useInventarioStore = defineStore('inventario', () => {
     itemsFiltrados,
     alertasStockBajo,
     moverStock,
+    descontarStockVenta,
     agregarProducto,
     actualizarProducto,
   }
