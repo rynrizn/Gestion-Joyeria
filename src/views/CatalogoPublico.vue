@@ -47,10 +47,10 @@ const agregarAlCarrito = (joya) => {
       <div class="barra-info-resultados">
         <span class="conteo-piezas">
           {{ productosStore.productosFiltrados.length }}
-          {{ productosStore.productosFiltrados.length === 1 ? 'joya disponible' : 'joyas disponibles' }}
+          {{ productosStore.productosFiltrados.length === 1 ? 'producto disponible' : 'productos disponibles' }}
         </span>
 
-        <span v-if="productosStore.categoriaActiva !== 'Todos'" class="filtro-activo-badge">
+        <span v-if="productosStore.categoriaActiva.toUpperCase() !== 'TODOS'" class="filtro-activo-badge">
           Categoría: {{ productosStore.categoriaActiva }}
         </span>
       </div>
@@ -71,7 +71,7 @@ const agregarAlCarrito = (joya) => {
         <div class="circulo-icono-alerta">
           <IconoLucide nombre="Search" :tamano="32" />
         </div>
-        <h3 class="titulo-sin-resultados">No encontramos piezas con ese criterio</h3>
+        <h3 class="titulo-sin-resultados">No encontramos productos con ese criterio</h3>
         <p class="desc-sin-resultados">
           Prueba con otra palabra clave o selecciona otra categoría.
         </p>
@@ -80,7 +80,7 @@ const agregarAlCarrito = (joya) => {
           class="boton-restablecer"
           @click="
             productosStore.busqueda = '';
-            productosStore.categoriaActiva = 'Todos';
+            productosStore.categoriaActiva = 'TODOS';
           "
         >
           Ver todo el catálogo

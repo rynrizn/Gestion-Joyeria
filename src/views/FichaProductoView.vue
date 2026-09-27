@@ -108,8 +108,12 @@ const agregarAlCarrito = () => {
             </span>
           </div>
 
-          <!-- Especificaciones Técnicas -->
+          <!-- Especificaciones Oficiales (Columnas de la base de datos) -->
           <div class="tabla-especificaciones">
+            <div class="fila-especificacion">
+              <span class="clave-spec">Categoría:</span>
+              <span class="valor-spec">{{ joya.categoria }}</span>
+            </div>
             <div class="fila-especificacion">
               <span class="clave-spec">Material:</span>
               <span class="valor-spec">{{ joya.material }}</span>
@@ -122,12 +126,6 @@ const agregarAlCarrito = () => {
               <span class="clave-spec">Medida / Talla:</span>
               <span class="valor-spec">{{ joya.talla }}</span>
             </div>
-          </div>
-
-          <!-- Descripción -->
-          <div class="bloque-descripcion">
-            <h2 class="subtitulo-seccion">Descripción</h2>
-            <p class="texto-descripcion">{{ joya.descripcion }}</p>
           </div>
 
           <!-- Botón de Añadir al Carrito -->
