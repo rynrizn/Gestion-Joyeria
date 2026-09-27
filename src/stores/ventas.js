@@ -188,7 +188,7 @@ export const useVentasStore = defineStore('ventas', () => {
   })
 
   // Registrar venta multi-producto con soporte de pago híbrido y clienta
-  const registrarVenta = ({
+  const registrarVenta = async ({
     items,
     cliente = 'Cliente Casual',
     metodoPago = 'EFECTIVO',
@@ -248,22 +248,27 @@ export const useVentasStore = defineStore('ventas', () => {
 
     // Sincronización en segundo plano con Supabase si está activo
     if (isSupabaseConfigured) {
-      supabase.rpc('crear_venta_completa', {
-        p_cliente: cliente,
-        p_metodo_pago: metodoPago,
-        p_monto_total: totalNeto,
-        p_monto_efectivo: efectivoReal,
-        p_monto_qr: qrReal,
-        p_descuento: Number(descuento || 0),
-        p_items: items,
-        p_observacion: observacion,
-        p_id_usuario: idVendedora || 1,
-      }).then(({ data: idVenta }) => {
+      try {
+        const { data: idVenta, error: errVenta } = await supabase.rpc('crear_venta_completa', {
+          p_cliente: cliente,
+          p_metodo_pago: metodoPago,
+          p_monto_total: totalNeto,
+          p_monto_efectivo: efectivoReal,
+          p_monto_qr: qrReal,
+          p_descuento: Number(descuento || 0),
+          p_items: items,
+          p_observacion: observacion,
+          p_id_usuario: idVendedora || 1,
+        })
         if (idVenta) {
           nuevaVenta.id = idVenta
           guardarEnStorage()
+        } else if (errVenta) {
+          console.warn('⚠️ [Supabase crear_venta_completa error]:', errVenta.message)
         }
-      }).catch((e) => console.warn('ℹ️ [Supabase Sync Venta]:', e))
+      } catch (e) {
+        console.warn('ℹ️ [Supabase Sync Venta]:', e)
+      }
     }
 
     return nuevaVenta

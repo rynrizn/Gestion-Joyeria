@@ -295,28 +295,66 @@ export const useInventarioStore = defineStore('inventario', () => {
     return false
   }
 
-  // Descontar stock por venta de mostrador según origen ('tienda', 'central', 'ambos')
-  const descontarStockVenta = ({ idProducto, cantidad, origenStock = 'tienda' }) => {
-    const joya = items.value.find((i) => i.id === Number(idProducto))
+  // Descontar stock por venta de mostrador según origen ('tienda', 'central', 'ambos') con persistencia en Supabase
+  const descontarStockVenta = async ({ idProducto, cantidad, origenStock = 'tienda' }) => {
+    const idNum = Number(idProducto)
+    const joya = items.value.find((i) => Number(i.id) === idNum)
     if (!joya || cantidad <= 0) return false
 
+    let cantTiendaDescontar = 0
+    let cantCentralDescontar = 0
+
     if (origenStock === 'tienda') {
+      cantTiendaDescontar = Math.min(cantidad, joya.stockTienda || 0)
       joya.stockTienda = Math.max(0, (joya.stockTienda || 0) - cantidad)
     } else if (origenStock === 'central') {
+      cantCentralDescontar = Math.min(cantidad, joya.stockCentral || 0)
       joya.stockCentral = Math.max(0, (joya.stockCentral || 0) - cantidad)
     } else if (origenStock === 'ambos') {
       let restante = cantidad
       const dispTienda = joya.stockTienda || 0
       if (dispTienda >= restante) {
+        cantTiendaDescontar = restante
         joya.stockTienda -= restante
         restante = 0
       } else {
+        cantTiendaDescontar = dispTienda
         joya.stockTienda = 0
         restante -= dispTienda
+        cantCentralDescontar = restante
         joya.stockCentral = Math.max(0, (joya.stockCentral || 0) - restante)
       }
     }
     guardarEnStorage()
+
+    // Sincronización en la base de datos Supabase
+    if (isSupabaseConfigured) {
+      try {
+        if (cantTiendaDescontar > 0) {
+          await supabase
+            .from('inventario')
+            .update({
+              cantidad: joya.stockTienda,
+              fecha_actualizacion: new Date().toISOString(),
+            })
+            .eq('id_producto', idNum)
+            .eq('id_ubicacion', 2)
+        }
+        if (cantCentralDescontar > 0) {
+          await supabase
+            .from('inventario')
+            .update({
+              cantidad: joya.stockCentral,
+              fecha_actualizacion: new Date().toISOString(),
+            })
+            .eq('id_producto', idNum)
+            .eq('id_ubicacion', 1)
+        }
+      } catch (e) {
+        console.warn('⚠️ [Supabase descontarStockVenta]:', e)
+      }
+    }
+
     return true
   }
 
@@ -392,6 +430,7 @@ export const useInventarioStore = defineStore('inventario', () => {
 
   return {
     items,
+    productos: items, // Alias para compatibilidad con vistas y componentes
     busqueda,
     filtroCategoria,
     ordenSeleccionado,

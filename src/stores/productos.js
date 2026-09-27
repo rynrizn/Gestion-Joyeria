@@ -433,6 +433,7 @@ export const useProductosStore = defineStore('productos', () => {
     agregarCategoria,
     obtenerPorId,
     actualizarProducto,
+    guardarProductosStorage,
     agregarProducto,
     eliminarProducto,
   }

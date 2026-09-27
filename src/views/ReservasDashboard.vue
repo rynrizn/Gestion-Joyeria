@@ -220,15 +220,15 @@ const contactarWhatsApp = (reserva) => {
               <!-- 2. Columna Disponibilidad: Evaluación multisede (Central / Tienda / Ambas) -->
               <td>
                 <div
-                  v-if="calcularDisponibilidadPedido(res, inventarioStore.productos)"
+                  v-if="calcularDisponibilidadPedido(res, inventarioStore.items)"
                   class="badge-disponibilidad-tabla"
-                  :class="calcularDisponibilidadPedido(res, inventarioStore.productos).clase"
+                  :class="calcularDisponibilidadPedido(res, inventarioStore.items).clase"
                 >
                   <IconoLucide
-                    :nombre="calcularDisponibilidadPedido(res, inventarioStore.productos).icono"
+                    :nombre="calcularDisponibilidadPedido(res, inventarioStore.items).icono"
                     :tamano="14"
                   />
-                  <span>{{ calcularDisponibilidadPedido(res, inventarioStore.productos).badge }}</span>
+                  <span>{{ calcularDisponibilidadPedido(res, inventarioStore.items).badge }}</span>
                 </div>
               </td>
 
@@ -292,7 +292,7 @@ const contactarWhatsApp = (reserva) => {
     <ModalDetallePedido
       :visible="modalDetalleVisible"
       :reserva="reservaSeleccionadaParaDetalle"
-      :productos-inventario="inventarioStore.productos"
+      :productos-inventario="inventarioStore.items"
       @cerrar="modalDetalleVisible = false"
       @completar-venta="completarVentaDesdeModal"
       @contactar-whatsapp="contactarWhatsApp"

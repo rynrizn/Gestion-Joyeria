@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 import { useProductosStore } from '../stores/productos'
 import { useInventarioStore } from '../stores/inventario'
 import { useVentasStore } from '../stores/ventas'
@@ -24,6 +25,7 @@ const authStore = useAuthStore()
 // Carrito de la venta actual (Multi-producto con control multisede)
 const itemsVenta = ref([])
 const productoBuscador = ref(null)
+const idReservaOrigen = ref(null)
 
 // Datos de la clienta
 const idClienteSeleccionado = ref('casual')
@@ -94,6 +96,7 @@ const alCambiarOrigenStock = (item) => {
 onMounted(() => {
   if (reservasStore.reservaActivaParaVenta) {
     const res = reservasStore.reservaActivaParaVenta
+    idReservaOrigen.value = res.id
 
     // 1. Cargar clienta
     if (res.cliente) {
@@ -287,7 +290,7 @@ const guardarNuevaClientaRapida = () => {
 }
 
 // Procesar confirmación de venta
-const procesarRegistroVenta = () => {
+const procesarRegistroVenta = async () => {
   // 1. Validar que haya joyas seleccionadas
   if (itemsVenta.value.length === 0) {
     modalErrorTitulo.value = 'Ticket Vacío'
@@ -326,7 +329,7 @@ const procesarRegistroVenta = () => {
   const vendedoraNombre = authStore.usuario?.nombre || (authStore.esAdmin ? 'Belen' : 'Personal de Tienda')
   const idVendedora = authStore.usuario?.id || 1
 
-  const ventaRegistrada = ventasStore.registrarVenta({
+  const ventaRegistrada = await ventasStore.registrarVenta({
     items: itemsVenta.value.map((it) => ({
       id: it.id,
       nombre: it.nombre,
@@ -347,16 +350,16 @@ const procesarRegistroVenta = () => {
     turno: ventasStore.turnoActual,
   })
 
-  // 4. Descontar stock con exactitud en inventarioStore y productosStore
-  itemsVenta.value.forEach((it) => {
-    // A) Descuenta multisede en inventarioStore
-    inventarioStore.descontarStockVenta({
+  // 4. Descontar stock con persistencia en Supabase y sincronización de stores
+  for (const it of itemsVenta.value) {
+    // A) Descuenta en inventarioStore y actualiza Supabase tabla inventario
+    await inventarioStore.descontarStockVenta({
       idProducto: it.id,
       cantidad: it.cantidad,
       origenStock: it.origenStock,
     })
 
-    // B) Sincroniza productosStore para el catálogo
+    // B) Sincroniza productosStore para el catálogo público
     const prod = productosStore.obtenerPorId(it.id)
     if (prod) {
       if (it.origenStock === 'tienda') {
@@ -377,7 +380,39 @@ const procesarRegistroVenta = () => {
       }
       prod.stock = (prod.stockTienda || 0) + (prod.stockCentral || 0)
     }
-  })
+  }
+  productosStore.guardarProductosStorage()
+
+  // 4.5. Si la venta se originó desde una reserva, marcarla como ENTREGADA y liberar cantidad_reservada
+  if (idReservaOrigen.value) {
+    try {
+      await reservasStore.cobrarReserva(idReservaOrigen.value)
+
+      // Liberar en Supabase las piezas que estaban apartadas como 'cantidad_reservada'
+      if (isSupabaseConfigured) {
+        for (const it of itemsVenta.value) {
+          const { data: invFilas } = await supabase
+            .from('inventario')
+            .select('*')
+            .eq('id_producto', it.id)
+          if (invFilas) {
+            for (const fila of invFilas) {
+              if (fila.cantidad_reservada > 0) {
+                const nuevaReservada = Math.max(0, fila.cantidad_reservada - it.cantidad)
+                await supabase
+                  .from('inventario')
+                  .update({ cantidad_reservada: nuevaReservada })
+                  .eq('id_inventario', fila.id_inventario)
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ [Completar Reserva en Venta]:', e)
+    }
+    idReservaOrigen.value = null
+  }
 
   // 5. Mostrar modal de comprobante y reiniciar estado
   ultimaVentaRegistrada.value = ventaRegistrada

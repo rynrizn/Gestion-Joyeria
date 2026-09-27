@@ -101,24 +101,38 @@ export const calcularDisponibilidadPedido = (reserva, inventarioProductos = []) 
     }
   }
 
+  const listaInv = Array.isArray(inventarioProductos) ? inventarioProductos : []
+
   let todosEnTienda = true
   let todosEnCentral = true
   let alcanzableCombinado = true
 
   for (const it of items) {
-    const prod = inventarioProductos.find((p) => p.id === it.id)
-    const stockTienda = prod ? Number(prod.stockTienda || 0) : 0
-    const stockCentral = prod ? Number(prod.stockCentral || 0) : 0
-    const cant = Number(it.cantidad || 1)
+    const prod = listaInv.find((p) => Number(p.id || p.id_producto) === Number(it.id || it.id_producto))
+    
+    // Si encontramos el producto en el inventario activo
+    if (prod) {
+      const stockTienda = Number(prod.stockTienda ?? prod.stock_tienda ?? 0)
+      const stockCentral = Number(prod.stockCentral ?? prod.stock_central ?? 0)
+      const cant = Number(it.cantidad || 1)
 
-    if (stockTienda < cant) {
-      todosEnTienda = false
-    }
-    if (stockCentral < cant) {
-      todosEnCentral = false
-    }
-    if ((stockTienda + stockCentral) < cant) {
-      alcanzableCombinado = false
+      if (stockTienda < cant) {
+        todosEnTienda = false
+      }
+      if (stockCentral < cant) {
+        todosEnCentral = false
+      }
+      if ((stockTienda + stockCentral) < cant) {
+        alcanzableCombinado = false
+      }
+    } else {
+      // Fallback: si no tenemos la lista de inventario en memoria, nos basamos en la ubicación donde se apartó la reserva
+      const ubicacionId = it.idUbicacion || (it.ubicacion?.toUpperCase().includes('TIENDA') || it.ubicacion?.toUpperCase().includes('MERCADITO') ? 2 : 1)
+      if (ubicacionId === 1) {
+        todosEnTienda = false
+      } else {
+        todosEnCentral = false
+      }
     }
   }
 
@@ -167,22 +181,26 @@ export const calcularDisponibilidadPedido = (reserva, inventarioProductos = []) 
  */
 export const enriquecerItemsReserva = (reserva, inventarioProductos = []) => {
   const items = reserva?.items || []
+  const listaInv = Array.isArray(inventarioProductos) ? inventarioProductos : []
+
   return items.map((it) => {
-    const prod = inventarioProductos.find((p) => p.id === it.id)
+    const prod = listaInv.find((p) => Number(p.id || p.id_producto) === Number(it.id || it.id_producto))
     const precioUnit = Number(it.precio || prod?.precio || prod?.precio_venta || 0)
     const cant = Number(it.cantidad || 1)
+    const stockC = prod ? Number(prod.stockCentral ?? prod.stock_central ?? 0) : 0
+    const stockT = prod ? Number(prod.stockTienda ?? prod.stock_tienda ?? 0) : 0
 
     return {
       id: it.id,
       nombre: it.nombre || prod?.nombre || 'Producto sin nombre',
-      categoria: prod?.categoria || 'Joyas',
-      material: prod?.material || 'Acero 316L',
-      color: prod?.color || 'Plateado',
-      talla: prod?.talla || 'Ajustable',
+      categoria: prod?.categoria || it.categoria || 'Joyas',
+      material: prod?.material || it.material || 'Acero 316L',
+      color: prod?.color || it.color || 'Plateado',
+      talla: prod?.talla || it.talla || 'Ajustable',
       imagen: prod?.imagen || it.imagen || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
-      stockCentral: prod ? Number(prod.stockCentral || 0) : 0,
-      stockTienda: prod ? Number(prod.stockTienda || 0) : 0,
-      stockTotal: prod ? (Number(prod.stockCentral || 0) + Number(prod.stockTienda || 0)) : 0,
+      stockCentral: stockC,
+      stockTienda: stockT,
+      stockTotal: prod ? (stockC + stockT) : (it.idUbicacion === 1 ? cant : cant),
       cantidad: cant,
       precioUnitario: precioUnit,
       subtotal: precioUnit * cant,
