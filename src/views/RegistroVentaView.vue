@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useProductosStore } from '../stores/productos'
+import { useInventarioStore } from '../stores/inventario'
 import { useVentasStore } from '../stores/ventas'
 import { useClientesStore } from '../stores/clientes'
 import { useReservasStore } from '../stores/reservas'
@@ -14,12 +15,13 @@ import InputTexto from '../components/common/InputTexto.vue'
 import IconoLucide from '../components/common/IconoLucide.vue'
 
 const productosStore = useProductosStore()
+const inventarioStore = useInventarioStore()
 const ventasStore = useVentasStore()
 const clientesStore = useClientesStore()
 const reservasStore = useReservasStore()
 const authStore = useAuthStore()
 
-// Carrito de la venta actual (Multi-producto)
+// Carrito de la venta actual (Multi-producto con control multisede)
 const itemsVenta = ref([])
 const productoBuscador = ref(null)
 
@@ -45,6 +47,41 @@ const modalErrorTitulo = ref('')
 const modalErrorMensaje = ref('')
 const modalErrorDetalles = ref('')
 
+// Determinar el origen predeterminado inteligente según dónde haya más stock:
+// Si hay más en Central -> 'central'
+// Si hay más o igual en Tienda -> 'tienda'
+const determinarOrigenPredeterminado = (stockTienda = 0, stockCentral = 0) => {
+  if (stockCentral > stockTienda) {
+    return 'central'
+  }
+  return 'tienda'
+}
+
+// Obtener el límite máximo de piezas que se pueden vender según el origen elegido
+const obtenerStockMaximoItem = (item) => {
+  const sTienda = Number(item.stockTienda || 0)
+  const sCentral = Number(item.stockCentral || 0)
+  if (item.origenStock === 'tienda') return sTienda
+  if (item.origenStock === 'central') return sCentral
+  if (item.origenStock === 'ambos') return sTienda + sCentral
+  return sTienda + sCentral
+}
+
+// Al cambiar de sede de descuento en el listbox
+const alCambiarOrigenStock = (item) => {
+  const max = obtenerStockMaximoItem(item)
+  if (max <= 0) {
+    modalErrorTitulo.value = 'Sin Stock en Ubicación Seleccionada'
+    modalErrorMensaje.value = `No hay existencias disponibles de "${item.nombre}" en la opción elegida.`
+    modalErrorDetalles.value = 'Por favor selecciona otra sede o elige "Ambas Sedes".'
+    modalErrorVisible.value = true
+    return
+  }
+  if (item.cantidad > max) {
+    item.cantidad = max
+  }
+}
+
 // Verificar si venimos de una reserva del Dashboard
 onMounted(() => {
   if (reservasStore.reservaActivaParaVenta) {
@@ -58,27 +95,36 @@ onMounted(() => {
       if (encontrada) {
         idClienteSeleccionado.value = encontrada.id
       } else {
-        // Registramos temporalmente el nombre
         observacion.value = `Reserva #${res.id} convertida a venta`
       }
     }
 
-    // 2. Cargar items reservados
+    // 2. Cargar items reservados con detección multisede
     if (res.items && res.items.length) {
       itemsVenta.value = res.items.map((it) => {
-        const prodCompleto = productosStore.obtenerPorId(it.id)
+        const prod = productosStore.obtenerPorId(it.id) || inventarioStore.items.find((p) => p.id === it.id)
+        const sTienda = Number(prod?.stockTienda ?? 0)
+        const sCentral = Number(prod?.stockCentral ?? (prod?.stock ?? 0))
+        const defOrigen = determinarOrigenPredeterminado(sTienda, sCentral)
+
         return {
           id: it.id,
           nombre: it.nombre,
           precio: Number(it.precio),
           cantidad: Number(it.cantidad || 1),
-          imagen: prodCompleto?.imagen || '',
-          stockMaximo: prodCompleto?.stockTienda ?? prodCompleto?.stock ?? 10,
+          imagen: prod?.imagen || '',
+          stockTienda: sTienda,
+          stockCentral: sCentral,
+          origenStock: defOrigen,
         }
       })
     } else if (res.idProducto) {
-      const prod = productosStore.obtenerPorId(res.idProducto)
+      const prod = productosStore.obtenerPorId(res.idProducto) || inventarioStore.items.find((p) => p.id === res.idProducto)
       if (prod) {
+        const sTienda = Number(prod.stockTienda ?? 0)
+        const sCentral = Number(prod.stockCentral ?? (prod.stock ?? 0))
+        const defOrigen = determinarOrigenPredeterminado(sTienda, sCentral)
+
         itemsVenta.value = [
           {
             id: prod.id,
@@ -86,7 +132,9 @@ onMounted(() => {
             precio: Number(prod.precio_venta || prod.precio),
             cantidad: Number(res.cantidad || 1),
             imagen: prod.imagen || '',
-            stockMaximo: prod.stockTienda ?? prod.stock ?? 10,
+            stockTienda: sTienda,
+            stockCentral: sCentral,
+            origenStock: defOrigen,
           },
         ]
       }
@@ -97,30 +145,38 @@ onMounted(() => {
   }
 })
 
-// Acciones sobre el carrito de venta
+// Acciones sobre el carrito de venta con selección inteligente de stock
 const agregarJoyaAlTicket = (joya) => {
   if (!joya) return
 
-  const stockDisponible = joya.stockTienda !== undefined ? joya.stockTienda : (joya.stock || 0)
+  const joyaInv = inventarioStore.items.find((i) => i.id === joya.id) || joya
+  const sTienda = Number(joyaInv.stockTienda !== undefined ? joyaInv.stockTienda : (joya.stockTienda || 0))
+  const sCentral = Number(joyaInv.stockCentral !== undefined ? joyaInv.stockCentral : (joya.stockCentral || joya.stock || 0))
+  const sTotal = sTienda + sCentral
 
-  if (stockDisponible <= 0) {
-    modalErrorTitulo.value = 'Pieza Sin Stock Físico'
-    modalErrorMensaje.value = `La joya "${joya.nombre}" no tiene unidades disponibles en tienda física para venta directa.`
-    modalErrorDetalles.value = 'Por favor realiza un traslado de stock desde Central antes de vender.'
+  if (sTotal <= 0) {
+    modalErrorTitulo.value = 'Pieza Sin Stock'
+    modalErrorMensaje.value = `La joya "${joya.nombre}" no tiene unidades disponibles en ninguna sede.`
+    modalErrorDetalles.value = 'Por favor registra stock en inventario antes de vender.'
     modalErrorVisible.value = true
     productoBuscador.value = null
     return
   }
 
+  const defOrigen = determinarOrigenPredeterminado(sTienda, sCentral)
   const existente = itemsVenta.value.find((i) => i.id === joya.id)
 
   if (existente) {
-    if (existente.cantidad < stockDisponible) {
+    const maxPermitido = obtenerStockMaximoItem(existente)
+    if (existente.cantidad < maxPermitido) {
       existente.cantidad += 1
     } else {
       modalErrorTitulo.value = 'Límite de Stock Alcanzado'
-      modalErrorMensaje.value = `Ya has alcanzado el máximo disponible de "${joya.nombre}" (${stockDisponible} unidades).`
-      modalErrorDetalles.value = ''
+      const nombreSede = existente.origenStock === 'tienda' ? 'Tienda (Mercadito)' : existente.origenStock === 'central' ? 'Central (Dueña)' : 'Ambas Sedes'
+      modalErrorMensaje.value = `Has alcanzado el límite disponible de "${joya.nombre}" en ${nombreSede} (${maxPermitido} u.).`
+      modalErrorDetalles.value = existente.origenStock !== 'ambos' && sTotal > maxPermitido
+        ? 'Puedes cambiar la opción a "Ambas Sedes" para tomar unidades del otro almacén.'
+        : ''
       modalErrorVisible.value = true
     }
   } else {
@@ -130,7 +186,9 @@ const agregarJoyaAlTicket = (joya) => {
       precio: Number(joya.precio_venta || joya.precio || 0),
       cantidad: 1,
       imagen: joya.imagen || '',
-      stockMaximo: stockDisponible,
+      stockTienda: sTienda,
+      stockCentral: sCentral,
+      origenStock: defOrigen,
     })
   }
 
@@ -138,12 +196,18 @@ const agregarJoyaAlTicket = (joya) => {
 }
 
 const incrementarCantidad = (item) => {
-  if (item.cantidad < item.stockMaximo) {
+  const max = obtenerStockMaximoItem(item)
+  if (item.cantidad < max) {
     item.cantidad += 1
   } else {
-    modalErrorTitulo.value = 'Stock Físico Insuficiente'
-    modalErrorMensaje.value = `Solo se cuenta con ${item.stockMaximo} unidad(es) de "${item.nombre}" en tienda.`
-    modalErrorDetalles.value = ''
+    const nombreSede = item.origenStock === 'tienda' ? 'Tienda' : item.origenStock === 'central' ? 'Central Dueña' : 'Ambas Sedes'
+    const totalAmbas = (item.stockTienda || 0) + (item.stockCentral || 0)
+
+    modalErrorTitulo.value = 'Stock Insuficiente en Origen Seleccionado'
+    modalErrorMensaje.value = `Solo se cuenta con ${max} unidad(es) de "${item.nombre}" en ${nombreSede}.`
+    modalErrorDetalles.value = item.origenStock !== 'ambos' && totalAmbas > max
+      ? 'Puedes cambiar el selector a "Ambas Sedes" para utilizar las existencias conjuntas.'
+      : ''
     modalErrorVisible.value = true
   }
 }
@@ -243,7 +307,15 @@ const procesarRegistroVenta = () => {
   const idVendedora = authStore.usuario?.id || 1
 
   const ventaRegistrada = ventasStore.registrarVenta({
-    items: itemsVenta.value,
+    items: itemsVenta.value.map((it) => ({
+      id: it.id,
+      nombre: it.nombre,
+      precio: it.precio,
+      cantidad: it.cantidad,
+      origenStock: it.origenStock,
+      stockTienda: it.stockTienda,
+      stockCentral: it.stockCentral,
+    })),
     cliente: nombreClientaFinal.value,
     metodoPago: metodoPago.value,
     montoEfectivo: metodoPago.value === 'HIBRIDO' ? montoEfectivo.value : (metodoPago.value === 'EFECTIVO' ? totalFinal.value : 0),
@@ -255,15 +327,35 @@ const procesarRegistroVenta = () => {
     turno: ventasStore.turnoActual,
   })
 
-  // 4. Descontar stock localmente en productosStore
+  // 4. Descontar stock con exactitud en inventarioStore y productosStore
   itemsVenta.value.forEach((it) => {
+    // A) Descuenta multisede en inventarioStore
+    inventarioStore.descontarStockVenta({
+      idProducto: it.id,
+      cantidad: it.cantidad,
+      origenStock: it.origenStock,
+    })
+
+    // B) Sincroniza productosStore para el catálogo
     const prod = productosStore.obtenerPorId(it.id)
     if (prod) {
-      if (prod.stockTienda !== undefined) {
-        prod.stockTienda = Math.max(0, prod.stockTienda - it.cantidad)
-      } else if (prod.stock !== undefined) {
-        prod.stock = Math.max(0, prod.stock - it.cantidad)
+      if (it.origenStock === 'tienda') {
+        prod.stockTienda = Math.max(0, (prod.stockTienda || 0) - it.cantidad)
+      } else if (it.origenStock === 'central') {
+        prod.stockCentral = Math.max(0, (prod.stockCentral || 0) - it.cantidad)
+      } else if (it.origenStock === 'ambos') {
+        let rem = it.cantidad
+        const dispT = prod.stockTienda || 0
+        if (dispT >= rem) {
+          prod.stockTienda -= rem
+          rem = 0
+        } else {
+          prod.stockTienda = 0
+          rem -= dispT
+          prod.stockCentral = Math.max(0, (prod.stockCentral || 0) - rem)
+        }
       }
+      prod.stock = (prod.stockTienda || 0) + (prod.stockCentral || 0)
     }
   })
 
@@ -342,6 +434,30 @@ const procesarRegistroVenta = () => {
               <div class="info-item-ticket">
                 <span class="nombre-item-ticket">{{ item.nombre }}</span>
                 <span class="precio-unitario-ticket">Bs. {{ item.precio }} c/u</span>
+
+                <!-- Selector de Origen de Stock (Listbox) -->
+                <div class="selector-origen-stock-caja">
+                  <label class="etiqueta-origen-stock">
+                    <IconoLucide nombre="Boxes" :tamano="11" />
+                    <span>Origen:</span>
+                  </label>
+                  <select
+                    v-model="item.origenStock"
+                    class="select-origen-pos"
+                    :title="`Selecciona la sede de donde descontar ${item.nombre}`"
+                    @change="alCambiarOrigenStock(item)"
+                  >
+                    <option value="tienda">
+                      🏪 Tienda ({{ item.stockTienda }} u.)
+                    </option>
+                    <option value="central">
+                      🏠 Central Dueña ({{ item.stockCentral }} u.)
+                    </option>
+                    <option value="ambos">
+                      🔀 Ambas Sedes (Total: {{ (item.stockTienda || 0) + (item.stockCentral || 0) }} u.)
+                    </option>
+                  </select>
+                </div>
               </div>
 
               <!-- Controles de Cantidad -->
@@ -631,8 +747,13 @@ const procesarRegistroVenta = () => {
               :key="it.id"
               class="fila-item-comprobante"
             >
-              <span>{{ it.nombre }} (x{{ it.cantidad }})</span>
-              <span>Bs. {{ it.precio * it.cantidad }}</span>
+              <div class="comprobante-item-info">
+                <span>{{ it.nombre }} (x{{ it.cantidad }})</span>
+                <span v-if="it.origenStock" class="badge-origen-recibo">
+                  {{ it.origenStock === 'tienda' ? '🏪 Tienda' : it.origenStock === 'central' ? '🏠 Central' : '🔀 Ambas Sedes' }}
+                </span>
+              </div>
+              <span class="precio-item-comprobante">Bs. {{ it.precio * it.cantidad }}</span>
             </div>
           </div>
 
@@ -813,6 +934,7 @@ const procesarRegistroVenta = () => {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -828,6 +950,44 @@ const procesarRegistroVenta = () => {
 .precio-unitario-ticket {
   font-size: 11px;
   color: var(--color-neutral-600);
+}
+
+.selector-origen-stock-caja {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.etiqueta-origen-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--color-primario);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.select-origen-pos {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-neutral-900);
+  background-color: var(--color-blanco);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radio-sm);
+  outline: none;
+  cursor: pointer;
+  max-width: 210px;
+  transition: border-color var(--transicion-rapida);
+}
+
+.select-origen-pos:focus {
+  border-color: var(--color-primario);
+  box-shadow: 0 0 0 2px rgba(62, 18, 24, 0.1);
 }
 
 .controles-cantidad-ticket {
@@ -1189,9 +1349,33 @@ const procesarRegistroVenta = () => {
 
 .fila-item-comprobante {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   font-size: 12.5px;
   color: var(--color-neutral-800);
+  padding: 3px 0;
+}
+
+.comprobante-item-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge-origen-recibo {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radio-completo);
+  background-color: var(--color-primario-fondo);
+  color: var(--color-primario);
+  border: 1px solid rgba(62, 18, 24, 0.15);
+}
+
+.precio-item-comprobante {
+  font-weight: 700;
+  color: var(--color-neutral-900);
 }
 
 .total-destacado {
