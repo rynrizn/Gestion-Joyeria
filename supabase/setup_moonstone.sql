@@ -1,36 +1,34 @@
 -- ============================================================
--- MOONSTONE JOYERÍA - SCRIPT COMPLETO DE CONFIGURACIÓN SUPABASE
--- Compatible con Moonstone_BD-final.txt
--- ============================================================
--- Este script realiza 6 tareas fundamentales:
--- 1. Agrega campos faltantes en cliente (ci, telefono).
--- 2. Inserta los datos base de roles, sedes, categorías y usuaria admin (Belen).
--- 3. Crea las vistas optimizadas para el Catálogo Web, Inventario, Clientes y Ventas.
--- 4. Crea las funciones transaccionales (RPC) para crear productos, ventas y traslados.
--- 5. Habilita las políticas de seguridad RLS para acceso con la clave anon.
--- 6. Otorga todos los permisos necesarios a los roles anon y authenticated.
+-- MOONSTONE - SCRIPT DE COMPATIBILIDAD Y REPARACIÓN SUPABASE
 -- ============================================================
 
--- 1. EXTENSIÓN DE TABLAS
-ALTER TABLE cliente
+-- PASO 1: ELIMINAR VISTAS ANTERIORES PARA EVITAR ERROR DE COLUMNAS (42P16)
+-- PostgreSQL no permite cambiar nombres o tipos de columnas con CREATE OR REPLACE VIEW.
+-- Por eso es obligatorio borrarlas antes de crearlas con la nueva estructura.
+DROP VIEW IF EXISTS public.vw_catalogo_publico CASCADE;
+DROP VIEW IF EXISTS public.vw_inventario CASCADE;
+DROP VIEW IF EXISTS public.vw_historial_cliente CASCADE;
+DROP VIEW IF EXISTS public.vw_reporte_ventas CASCADE;
+DROP VIEW IF EXISTS public.vw_stock_bajo CASCADE;
+
+-- PASO 2: EXTENSIÓN DE TABLA CLIENTE
+ALTER TABLE public.cliente
 ADD COLUMN IF NOT EXISTS ci VARCHAR(30),
 ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
 
-UPDATE cliente SET telefono = contacto_telefono WHERE telefono IS NULL;
+UPDATE public.cliente SET telefono = contacto_telefono WHERE telefono IS NULL;
 
-
--- 2. DATOS BASE ESENCIALES (Evita errores de clave foránea)
-
+-- PASO 3: INSERTAR DATOS MAESTROS (EVITA ERROR DE CLAVE FORÁNEA)
 -- Roles
-INSERT INTO rol (id_rol, nombre, descripcion)
+INSERT INTO public.rol (id_rol, nombre, descripcion)
 OVERRIDING SYSTEM VALUE
 VALUES 
     (1, 'ADMINISTRADORA', 'Propietaria y administradora general del sistema'),
     (2, 'PERSONAL_TIENDA', 'Personal encargado de ventas y consultas de inventario')
 ON CONFLICT (nombre) DO NOTHING;
 
--- Ubicaciones (1 = Central, 2 = Mercadito Creativo)
-INSERT INTO ubicacion (id_ubicacion, nombre, descripcion, activo)
+-- Ubicaciones
+INSERT INTO public.ubicacion (id_ubicacion, nombre, descripcion, activo)
 OVERRIDING SYSTEM VALUE
 VALUES 
     (1, 'CENTRAL', 'Stock administrado directamente por la propietaria', TRUE),
@@ -38,7 +36,7 @@ VALUES
 ON CONFLICT (nombre) DO NOTHING;
 
 -- Categorías Iniciales
-INSERT INTO categoria (nombre, activo)
+INSERT INTO public.categoria (nombre, activo)
 VALUES 
     ('AROS MINI', TRUE),
     ('CINTURONES', TRUE),
@@ -50,18 +48,22 @@ VALUES
     ('COLLARES', TRUE)
 ON CONFLICT (nombre) DO NOTHING;
 
--- Usuaria Administradora Principal (Belen, id_usuario = 1)
-INSERT INTO usuario (id_usuario, nombre, nombre_usuario, password_hash, activo, id_rol)
+-- Usuaria Administradora (id_usuario = 1)
+INSERT INTO public.usuario (id_usuario, nombre, nombre_usuario, password_hash, activo, id_rol)
 OVERRIDING SYSTEM VALUE
 VALUES 
     (1, 'Belen', 'admin', 'pbkdf2_sha256$placeholder_hash', TRUE, 1)
 ON CONFLICT (nombre_usuario) DO NOTHING;
 
+-- Sincronizar secuencias
+SELECT setval(pg_get_serial_sequence('public.rol', 'id_rol'), COALESCE((SELECT MAX(id_rol) FROM public.rol), 1));
+SELECT setval(pg_get_serial_sequence('public.ubicacion', 'id_ubicacion'), COALESCE((SELECT MAX(id_ubicacion) FROM public.ubicacion), 1));
+SELECT setval(pg_get_serial_sequence('public.usuario', 'id_usuario'), COALESCE((SELECT MAX(id_usuario) FROM public.usuario), 1));
 
--- 3. VISTAS ADAPTADAS AL FRONTEND
+-- PASO 4: VISTAS DEL SISTEMA
 
--- 3.1 Catálogo Público
-CREATE OR REPLACE VIEW public.vw_catalogo_publico AS
+-- 4.1 Catálogo Público
+CREATE VIEW public.vw_catalogo_publico AS
 SELECT 
     p.id_producto,
     p.nombre,
@@ -93,9 +95,8 @@ LEFT JOIN public.inventario inv ON p.id_producto = inv.id_producto
 WHERE p.activo = TRUE
 GROUP BY p.id_producto, p.nombre, c.nombre, p.material, p.color, p.talla, p.precio_venta, p.stock_minimo, p.es_prioritario, p.activo;
 
-
--- 3.2 Inventario Administrativo Multisede
-CREATE OR REPLACE VIEW public.vw_inventario AS
+-- 4.2 Inventario Administrativo
+CREATE VIEW public.vw_inventario AS
 SELECT 
     p.id_producto,
     p.nombre,
@@ -127,9 +128,8 @@ LEFT JOIN public.categoria c ON p.id_categoria = c.id_categoria
 LEFT JOIN public.inventario inv ON p.id_producto = inv.id_producto
 GROUP BY p.id_producto, p.nombre, c.nombre, p.material, p.color, p.talla, p.precio_venta, p.stock_minimo, p.es_prioritario, p.activo;
 
-
--- 3.3 Historial de Clientas
-CREATE OR REPLACE VIEW public.vw_historial_cliente AS
+-- 4.3 Historial de Clientas
+CREATE VIEW public.vw_historial_cliente AS
 SELECT 
     c.id_cliente,
     c.nombre,
@@ -142,9 +142,8 @@ SELECT
     COALESCE((SELECT SUM(v.monto_total) FROM public.venta v WHERE v.id_cliente = c.id_cliente), 0) AS total_gastado
 FROM public.cliente c;
 
-
--- 3.4 Reporte de Ventas
-CREATE OR REPLACE VIEW public.vw_reporte_ventas AS
+-- 4.4 Reporte de Ventas
+CREATE VIEW public.vw_reporte_ventas AS
 SELECT 
     v.id_venta,
     v.fecha_hora,
@@ -187,10 +186,9 @@ LEFT JOIN public.rol r ON r.id_rol = u.id_rol
 LEFT JOIN public.cliente c ON c.id_cliente = v.id_cliente
 LEFT JOIN public.pago p ON p.id_venta = v.id_venta;
 
+-- PASO 5: FUNCIONES RPC TRANSACCIONALES
 
--- 4. PROCEDIMIENTOS ALMACENADOS (RPC) TRANSACCIONALES
-
--- 4.1 Alta Completa de Producto desde la Web
+-- 5.1 Crear Producto Completo
 CREATE OR REPLACE FUNCTION public.crear_producto_completo(
     p_nombre VARCHAR,
     p_categoria VARCHAR,
@@ -214,7 +212,7 @@ DECLARE
     v_id_categoria INT;
     v_id_producto INT;
 BEGIN
-    SELECT id_categoria INTO v_id_categoria FROM public.categoria WHERE UPPER(nombre) = UPPER(TRIM(p_categoria));
+    SELECT id_categoria INTO v_id_categoria FROM public.categoria WHERE UPPER(nombre) = UPPER(TRIM(p_categoria)) LIMIT 1;
     IF v_id_categoria IS NULL THEN
         INSERT INTO public.categoria (nombre, activo) 
         VALUES (UPPER(TRIM(p_categoria)), TRUE)
@@ -229,17 +227,14 @@ BEGIN
     )
     RETURNING id_producto INTO v_id_producto;
 
-    IF p_stock_central > 0 THEN
-        UPDATE public.inventario 
-        SET cantidad = p_stock_central 
-        WHERE id_producto = v_id_producto AND id_ubicacion = 1;
-    END IF;
+    -- Asegurar cantidades en inventario para ambas sedes
+    INSERT INTO public.inventario (id_producto, id_ubicacion, cantidad, cantidad_reservada)
+    VALUES (v_id_producto, 1, p_stock_central, 0)
+    ON CONFLICT (id_producto, id_ubicacion) DO UPDATE SET cantidad = EXCLUDED.cantidad;
 
-    IF p_stock_tienda > 0 THEN
-        UPDATE public.inventario 
-        SET cantidad = p_stock_tienda 
-        WHERE id_producto = v_id_producto AND id_ubicacion = 2;
-    END IF;
+    INSERT INTO public.inventario (id_producto, id_ubicacion, cantidad, cantidad_reservada)
+    VALUES (v_id_producto, 2, p_stock_tienda, 0)
+    ON CONFLICT (id_producto, id_ubicacion) DO UPDATE SET cantidad = EXCLUDED.cantidad;
 
     IF p_imagen IS NOT NULL AND TRIM(p_imagen) <> '' THEN
         INSERT INTO public.imagen (url_imagen, es_portada, id_producto)
@@ -255,8 +250,7 @@ BEGIN
 END;
 $$;
 
-
--- 4.2 Edición Completa de Producto
+-- 5.2 Actualizar Producto Completo
 CREATE OR REPLACE FUNCTION public.actualizar_producto_completo(
     p_id_producto INT,
     p_nombre VARCHAR,
@@ -280,7 +274,7 @@ AS $$
 DECLARE
     v_id_categoria INT;
 BEGIN
-    SELECT id_categoria INTO v_id_categoria FROM public.categoria WHERE UPPER(nombre) = UPPER(TRIM(p_categoria));
+    SELECT id_categoria INTO v_id_categoria FROM public.categoria WHERE UPPER(nombre) = UPPER(TRIM(p_categoria)) LIMIT 1;
     IF v_id_categoria IS NULL THEN
         INSERT INTO public.categoria (nombre, activo) 
         VALUES (UPPER(TRIM(p_categoria)), TRUE)
@@ -301,15 +295,15 @@ BEGIN
     WHERE id_producto = p_id_producto;
 
     IF p_stock_central IS NOT NULL THEN
-        UPDATE public.inventario 
-        SET cantidad = p_stock_central 
-        WHERE id_producto = p_id_producto AND id_ubicacion = 1;
+        INSERT INTO public.inventario (id_producto, id_ubicacion, cantidad, cantidad_reservada)
+        VALUES (p_id_producto, 1, p_stock_central, 0)
+        ON CONFLICT (id_producto, id_ubicacion) DO UPDATE SET cantidad = EXCLUDED.cantidad;
     END IF;
 
     IF p_stock_tienda IS NOT NULL THEN
-        UPDATE public.inventario 
-        SET cantidad = p_stock_tienda 
-        WHERE id_producto = p_id_producto AND id_ubicacion = 2;
+        INSERT INTO public.inventario (id_producto, id_ubicacion, cantidad, cantidad_reservada)
+        VALUES (p_id_producto, 2, p_stock_tienda, 0)
+        ON CONFLICT (id_producto, id_ubicacion) DO UPDATE SET cantidad = EXCLUDED.cantidad;
     END IF;
 
     IF p_imagen IS NOT NULL AND TRIM(p_imagen) <> '' THEN
@@ -326,8 +320,7 @@ BEGIN
 END;
 $$;
 
-
--- 4.3 Registrar Venta con Descuento de Stock y Pago
+-- 5.3 Registrar Venta Completa
 CREATE OR REPLACE FUNCTION public.crear_venta_completa(
     p_cliente VARCHAR,
     p_metodo_pago VARCHAR,
@@ -352,6 +345,8 @@ DECLARE
     v_precio NUMERIC;
     v_subtotal NUMERIC;
     v_metodo_valido VARCHAR(30);
+    v_efectivo NUMERIC;
+    v_transferencia NUMERIC;
 BEGIN
     IF p_cliente IS NOT NULL AND TRIM(p_cliente) <> '' AND UPPER(TRIM(p_cliente)) <> 'CLIENTE CASUAL' THEN
         SELECT id_cliente INTO v_id_cliente FROM public.cliente WHERE UPPER(nombre) = UPPER(TRIM(p_cliente)) LIMIT 1;
@@ -366,6 +361,17 @@ BEGIN
         v_metodo_valido := UPPER(p_metodo_pago);
     END IF;
 
+    IF v_metodo_valido = 'EFECTIVO' THEN
+        v_efectivo := p_monto_total;
+        v_transferencia := 0;
+    ELSIF v_metodo_valido = 'TRANSFERENCIA' THEN
+        v_efectivo := 0;
+        v_transferencia := p_monto_total;
+    ELSE
+        v_efectivo := p_monto_efectivo;
+        v_transferencia := p_monto_qr;
+    END IF;
+
     INSERT INTO public.venta (
         subtotal, descuento, monto_total, tipo_venta, observacion, id_cliente, id_usuario
     )
@@ -374,13 +380,13 @@ BEGIN
     )
     RETURNING id_venta INTO v_id_venta;
 
-    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id INT, cantidad INT, precio NUMERIC, origen_stock TEXT, origenStock TEXT)
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id INT, cantidad INT, precio NUMERIC, origen_stock TEXT, "origenStock" TEXT)
     LOOP
         v_cant := COALESCE(v_item.cantidad, 1);
         v_precio := COALESCE(v_item.precio, 0);
         v_subtotal := v_cant * v_precio;
 
-        IF COALESCE(v_item.origenStock, v_item.origen_stock) = 'central' THEN
+        IF COALESCE(v_item."origenStock", v_item.origen_stock) = 'central' THEN
             v_ubicacion_id := 1;
         ELSE
             v_ubicacion_id := 2;
@@ -408,36 +414,75 @@ BEGIN
         'PAGADO',
         0,
         v_id_venta,
-        CASE WHEN v_metodo_valido = 'EFECTIVO' THEN p_monto_total WHEN v_metodo_valido = 'HIBRIDO' THEN p_monto_efectivo ELSE 0 END,
-        CASE WHEN v_metodo_valido = 'TRANSFERENCIA' THEN p_monto_total WHEN v_metodo_valido = 'HIBRIDO' THEN p_monto_qr ELSE 0 END
+        v_efectivo,
+        v_transferencia
     );
 
     RETURN v_id_venta;
 END;
 $$;
 
+-- PASO 6: POLÍTICAS RLS (Permitir acceso web anon y authenticated)
+ALTER TABLE public.rol ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.usuario ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cliente ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ubicacion ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.producto ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.imagen ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventario ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reserva ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.detalle_reserva ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.venta ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.detalle_venta ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pago ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.movimiento_inventario ENABLE ROW LEVEL SECURITY;
 
--- 5. POLÍTICAS RLS (Permitir lectura y escritura a la aplicación con anon)
-DO $$ 
-DECLARE 
-    t text;
-    tablas text[] := ARRAY[
-        'rol', 'usuario', 'cliente', 'categoria', 'ubicacion', 
-        'producto', 'imagen', 'inventario', 'reserva', 'detalle_reserva', 
-        'venta', 'detalle_venta', 'pago', 'movimiento_inventario'
-    ];
-BEGIN
-    FOREACH t IN ARRAY tablas LOOP
-        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
-        EXECUTE format('DROP POLICY IF EXISTS "acceso_total_%s" ON public.%I;', t, t);
-        EXECUTE format('CREATE POLICY "acceso_total_%s" ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);', t, t);
-    END LOOP;
-END $$;
+DROP POLICY IF EXISTS "anon_rol" ON public.rol;
+CREATE POLICY "anon_rol" ON public.rol FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "anon_usuario" ON public.usuario;
+CREATE POLICY "anon_usuario" ON public.usuario FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
--- 6. PERMISOS EXPLÍCITOS PARA ROLES ANON Y AUTHENTICATED
+DROP POLICY IF EXISTS "anon_cliente" ON public.cliente;
+CREATE POLICY "anon_cliente" ON public.cliente FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_categoria" ON public.categoria;
+CREATE POLICY "anon_categoria" ON public.categoria FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_ubicacion" ON public.ubicacion;
+CREATE POLICY "anon_ubicacion" ON public.ubicacion FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_producto" ON public.producto;
+CREATE POLICY "anon_producto" ON public.producto FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_imagen" ON public.imagen;
+CREATE POLICY "anon_imagen" ON public.imagen FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_inventario" ON public.inventario;
+CREATE POLICY "anon_inventario" ON public.inventario FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_reserva" ON public.reserva;
+CREATE POLICY "anon_reserva" ON public.reserva FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_detalle_reserva" ON public.detalle_reserva;
+CREATE POLICY "anon_detalle_reserva" ON public.detalle_reserva FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_venta" ON public.venta;
+CREATE POLICY "anon_venta" ON public.venta FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_detalle_venta" ON public.detalle_venta;
+CREATE POLICY "anon_detalle_venta" ON public.detalle_venta FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_pago" ON public.pago;
+CREATE POLICY "anon_pago" ON public.pago FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "anon_movimiento_inventario" ON public.movimiento_inventario;
+CREATE POLICY "anon_movimiento_inventario" ON public.movimiento_inventario FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- PASO 7: PERMISOS EXPLÍCITOS
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated;
