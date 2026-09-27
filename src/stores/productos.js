@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, isSupabaseConfigured } from '../supabase/client'
 
-const CLAVE_PRODUCTOS = 'moonstone_productos'
-const CLAVE_CATEGORIAS = 'moonstone_categorias'
+const CLAVE_PRODUCTOS = 'moonstone_productos_v5'
+const CLAVE_CATEGORIAS = 'moonstone_categorias_v5'
 
 // Categorías oficiales predeterminadas en mayúsculas
 export const CATEGORIAS_BASE = [
@@ -397,6 +397,31 @@ export const useProductosStore = defineStore('productos', () => {
     return p
   }
 
+  // Eliminar producto por ID
+  const eliminarProducto = async (idProducto) => {
+    const idNum = Number(idProducto)
+    productos.value = productos.value.filter((p) => Number(p.id) !== idNum)
+    guardarProductosStorage()
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('producto')
+          .delete()
+          .eq('id_producto', idNum)
+
+        if (error) {
+          console.warn('⚠️ [Supabase Delete Producto]:', error.message)
+          return { exito: false, error: error.message }
+        }
+      } catch (e) {
+        console.warn('⚠️ [Supabase Delete Exception]:', e)
+        return { exito: false, error: e.message }
+      }
+    }
+    return { exito: true }
+  }
+
   return {
     productos,
     categorias,
@@ -409,5 +434,6 @@ export const useProductosStore = defineStore('productos', () => {
     obtenerPorId,
     actualizarProducto,
     agregarProducto,
+    eliminarProducto,
   }
 })

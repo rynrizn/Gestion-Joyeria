@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, isSupabaseConfigured } from '../supabase/client'
 
-const CLAVE_INVENTARIO = 'moonstone_inventario'
+const CLAVE_INVENTARIO = 'moonstone_inventario_v5'
 
 const ITEMS_INICIALES = [
   {
@@ -365,6 +365,31 @@ export const useInventarioStore = defineStore('inventario', () => {
     return false
   }
 
+  // Eliminar producto de inventario
+  const eliminarProducto = async (idProducto) => {
+    const idNum = Number(idProducto)
+    items.value = items.value.filter((i) => Number(i.id) !== idNum)
+    guardarEnStorage()
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('producto')
+          .delete()
+          .eq('id_producto', idNum)
+
+        if (error) {
+          console.warn('⚠️ [Supabase Delete Inventario]:', error.message)
+          return { exito: false, error: error.message }
+        }
+      } catch (e) {
+        console.warn('⚠️ [Supabase Delete Exception]:', e)
+        return { exito: false, error: e.message }
+      }
+    }
+    return { exito: true }
+  }
+
   return {
     items,
     busqueda,
@@ -377,5 +402,6 @@ export const useInventarioStore = defineStore('inventario', () => {
     cargarInventarioSupabase,
     agregarProducto,
     actualizarProducto,
+    eliminarProducto,
   }
 })

@@ -12,7 +12,7 @@ defineProps({
   },
 })
 
-defineEmits(['mover-stock', 'editar'])
+defineEmits(['mover-stock', 'editar', 'eliminar'])
 </script>
 
 <template>
@@ -122,6 +122,14 @@ defineEmits(['mover-stock', 'editar'])
                   @click="$emit('editar', producto)"
                 >
                   <IconoLucide nombre="Edit" :tamano="14" />
+                </button>
+                <button
+                  type="button"
+                  class="boton-eliminar"
+                  title="Eliminar producto"
+                  @click="$emit('eliminar', producto)"
+                >
+                  <IconoLucide nombre="Trash2" :tamano="14" />
                 </button>
               </div>
               <span v-else class="badge-solo-lectura" title="Solo la Administradora puede alterar el inventario">
@@ -371,6 +379,26 @@ defineEmits(['mover-stock', 'editar'])
 .boton-editar:hover {
   background-color: var(--color-neutral-200);
   color: var(--color-neutral-900);
+}
+
+.boton-eliminar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radio-sm);
+  border: 1px solid var(--color-neutral-200);
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  background-color: transparent;
+  transition: all var(--transicion-rapida);
+}
+
+.boton-eliminar:hover {
+  background-color: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
 }
 
 .badge-solo-lectura {

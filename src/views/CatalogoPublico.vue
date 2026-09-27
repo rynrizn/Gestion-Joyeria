@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProductosStore } from '../stores/productos'
 import { useCarritoStore } from '../stores/carrito'
@@ -12,6 +13,10 @@ import IconoLucide from '../components/common/IconoLucide.vue'
 const productosStore = useProductosStore()
 const carritoStore = useCarritoStore()
 const router = useRouter()
+
+onMounted(async () => {
+  await productosStore.cargarProductosSupabase()
+})
 
 const verDetalleJoya = (joya) => {
   router.push(`/producto/${joya.id}`)

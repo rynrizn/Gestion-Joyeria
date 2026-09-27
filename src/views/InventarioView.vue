@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useInventarioStore } from '../stores/inventario'
 import { useProductosStore } from '../stores/productos'
 import { useAuthStore } from '../stores/auth'
@@ -15,6 +15,10 @@ const inventarioStore = useInventarioStore()
 const productosStore = useProductosStore()
 const authStore = useAuthStore()
 
+onMounted(async () => {
+  await inventarioStore.cargarInventarioSupabase()
+})
+
 const categoriasParaFiltro = computed(() => {
   return productosStore.categorias.filter((c) => c !== 'TODOS')
 })
@@ -23,8 +27,10 @@ const categoriasParaFiltro = computed(() => {
 const modalAltaVisible = ref(false)
 const modalEdicionVisible = ref(false)
 const modalTrasladoVisible = ref(false)
+const modalConfirmarEliminarVisible = ref(false)
 const joyaSeleccionada = ref(null)
 const joyaEnEdicion = ref(null)
+const joyaParaEliminar = ref(null)
 
 // Modal de Error / Feedback
 const modalErrorVisible = ref(false)
@@ -86,6 +92,38 @@ const guardarEdicionJoya = async (datos) => {
   inventarioStore.actualizarProducto(datos.id, datos)
   modalEdicionVisible.value = false
   joyaEnEdicion.value = null
+}
+
+const abrirEliminar = (joya) => {
+  if (!authStore.esAdmin) {
+    modalErrorTitulo.value = 'Permiso Denegado'
+    modalErrorMensaje.value = 'Solo la Administradora tiene autorización para eliminar productos del sistema.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
+    return
+  }
+  joyaParaEliminar.value = joya
+  modalConfirmarEliminarVisible.value = true
+}
+
+const confirmarEliminarJoya = async () => {
+  if (!joyaParaEliminar.value) return
+
+  const id = joyaParaEliminar.value.id
+  const nombreProd = joyaParaEliminar.value.nombre
+
+  const resInv = await inventarioStore.eliminarProducto(id)
+  const resProd = await productosStore.eliminarProducto(id)
+
+  modalConfirmarEliminarVisible.value = false
+  joyaParaEliminar.value = null
+
+  if ((resInv && !resInv.exito) || (resProd && !resProd.exito)) {
+    modalErrorTitulo.value = 'No se puede eliminar'
+    modalErrorMensaje.value = `El producto "${nombreProd}" tiene ventas, reservas o movimientos registrados en la base de datos y no puede borrarse físicamente.`
+    modalErrorDetalles.value = 'Recomendación: En lugar de borrarlo, edítalo y desactiva el switch "Producto Activo" para ocultarlo del catálogo público sin alterar el historial contable.'
+    modalErrorVisible.value = true
+  }
 }
 
 const ejecutarTraslado = () => {
@@ -192,6 +230,7 @@ const ejecutarTraslado = () => {
       :es-admin="authStore.esAdmin"
       @mover-stock="abrirTraslado"
       @editar="abrirEdicion"
+      @eliminar="abrirEliminar"
     />
 
     <!-- Modal 1: Alta de Producto (Solo Dueña) -->
@@ -289,6 +328,36 @@ const ejecutarTraslado = () => {
           </button>
           <BotonPrincipal @click="ejecutarTraslado">
             Confirmar Traslado
+          </BotonPrincipal>
+        </div>
+      </div>
+    </ModalBase>
+
+    <!-- Modal 5: Confirmación de Eliminación de Producto (Solo Dueña) -->
+    <ModalBase
+      :visible="modalConfirmarEliminarVisible"
+      titulo="Eliminar Producto"
+      ancho-maximo="460px"
+      @cerrar="modalConfirmarEliminarVisible = false"
+    >
+      <div v-if="joyaParaEliminar" class="cuerpo-modal-eliminar">
+        <p class="texto-confirmar-eliminar">
+          ¿Estás segura de eliminar permanentemente la joya
+          <strong>"{{ joyaParaEliminar.nombre }}"</strong>?
+        </p>
+        <p class="advertencia-eliminar">
+          Esta acción removerá el producto de la base de datos, el inventario y el catálogo.
+        </p>
+        <div class="acciones-eliminar">
+          <button
+            type="button"
+            class="boton-cancelar"
+            @click="modalConfirmarEliminarVisible = false"
+          >
+            Cancelar
+          </button>
+          <BotonPrincipal variante="peligro" @click="confirmarEliminarJoya">
+            Sí, Eliminar Producto
           </BotonPrincipal>
         </div>
       </div>
@@ -489,5 +558,34 @@ const ejecutarTraslado = () => {
 .boton-cancelar:hover {
   background-color: var(--color-neutral-200);
   color: var(--color-neutral-900);
+}
+
+.cuerpo-modal-eliminar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.texto-confirmar-eliminar {
+  font-size: 15px;
+  color: var(--color-neutral-800);
+  line-height: 1.5;
+}
+
+.advertencia-eliminar {
+  font-size: 13px;
+  color: var(--color-neutral-600);
+  background-color: var(--color-neutral-50);
+  padding: 10px 14px;
+  border-radius: var(--radio-md);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.acciones-eliminar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
 }
 </style>
