@@ -4,6 +4,7 @@ import { useProductosStore } from '../../stores/productos'
 import InputTexto from '../common/InputTexto.vue'
 import BotonPrincipal from '../common/BotonPrincipal.vue'
 import IconoLucide from '../common/IconoLucide.vue'
+import { convertirAWebp, subirImagenStorage } from '../../utils/imagenes'
 
 const props = defineProps({
   productoInicial: {
@@ -36,9 +37,12 @@ const activo = ref(true)
 const mostrandoNuevaCat = ref(false)
 const nombreNuevaCat = ref('')
 
-// Fotos (Principal y Detalle)
+// Fotos (Archivos WebP convertidos, Previews y Estado de Carga)
 const foto1Preview = ref('')
 const foto2Preview = ref('')
+const archivoFoto1 = ref(null)
+const archivoFoto2 = ref(null)
+const subiendoFotos = ref(false)
 
 // Listas dinámicas derivadas de productos existentes + bases
 const categoriasDisponibles = computed(() => {
@@ -108,19 +112,55 @@ const crearNuevaCategoria = () => {
   }
 }
 
-const manejarSubidaFoto = (evento, numeroFoto) => {
+const manejarSubidaFoto = async (evento, numeroFoto) => {
   const archivo = evento.target.files[0]
   if (archivo) {
-    const url = URL.createObjectURL(archivo)
-    if (numeroFoto === 1) foto1Preview.value = url
-    if (numeroFoto === 2) foto2Preview.value = url
+    try {
+      // 1. Convertir a formato .webp y comprimir proporcionalmente
+      const archivoWebp = await convertirAWebp(archivo, 0.85, 1200)
+      const urlPreview = URL.createObjectURL(archivoWebp)
+
+      if (numeroFoto === 1) {
+        archivoFoto1.value = archivoWebp
+        foto1Preview.value = urlPreview
+      }
+      if (numeroFoto === 2) {
+        archivoFoto2.value = archivoWebp
+        foto2Preview.value = urlPreview
+      }
+    } catch (e) {
+      console.warn('Error al procesar la imagen a WebP:', e)
+      const urlFallback = URL.createObjectURL(archivo)
+      if (numeroFoto === 1) foto1Preview.value = urlFallback
+      if (numeroFoto === 2) foto2Preview.value = urlFallback
+    }
   }
 }
 
-const enviarFormulario = () => {
+const enviarFormulario = async () => {
   if (!nombre.value.trim() || !precio.value) {
     alert('Por favor, completa al menos el nombre y el precio del producto.')
     return
+  }
+
+  subiendoFotos.value = true
+  let urlFoto1 = foto1Preview.value
+  let urlFoto2 = foto2Preview.value
+
+  try {
+    // 2. Si se seleccionaron archivos nuevos, subirlos al Storage de Supabase
+    if (archivoFoto1.value) {
+      const urlSubida = await subirImagenStorage(archivoFoto1.value, 'portadas')
+      if (urlSubida) urlFoto1 = urlSubida
+    }
+    if (archivoFoto2.value) {
+      const urlSubida = await subirImagenStorage(archivoFoto2.value, 'detalles')
+      if (urlSubida) urlFoto2 = urlSubida
+    }
+  } catch (err) {
+    console.warn('⚠️ [Storage] Error subiendo imagen a Supabase Storage:', err)
+  } finally {
+    subiendoFotos.value = false
   }
 
   emit('guardar', {
@@ -138,8 +178,8 @@ const enviarFormulario = () => {
     stockMinimo: Number(stockMinimo.value || 1),
     es_prioritario: Boolean(esPrioritario.value),
     activo: Boolean(activo.value),
-    imagen: foto1Preview.value || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
-    imagen_detalle: foto2Preview.value || '',
+    imagen: urlFoto1 || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
+    imagen_detalle: urlFoto2 || '',
   })
 }
 </script>
@@ -346,8 +386,8 @@ const enviarFormulario = () => {
         Cancelar
       </button>
 
-      <BotonPrincipal tipo="submit">
-        {{ modo === 'editar' ? 'Guardar Cambios' : 'Guardar Producto en Inventario' }}
+      <BotonPrincipal tipo="submit" :cargando="subiendoFotos" :deshabilitado="subiendoFotos">
+        {{ subiendoFotos ? 'Procesando y Subiendo Fotos (WebP)...' : (modo === 'editar' ? 'Guardar Cambios' : 'Guardar Producto en Inventario') }}
       </BotonPrincipal>
     </div>
   </form>
