@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { CONFIG_NEGOCIO } from '../config/negocio'
 
 export const useCarritoStore = defineStore('carrito', () => {
   // Lista de items seleccionados: [{ producto, cantidad }]
@@ -67,7 +68,7 @@ export const useCarritoStore = defineStore('carrito', () => {
   }
 
   // Generador de enlace directo hacia WhatsApp para coordinar el pedido
-  const generarEnlaceWhatsApp = (telefono = '59170000000') => {
+  const generarEnlaceWhatsApp = (telefono = CONFIG_NEGOCIO.whatsappNumero) => {
     if (estaVacio.value) return '#'
 
     let mensaje = '¡Hola Moonstone Joyería! Deseo coordinar la compra de las siguientes joyas de su catálogo:%0A%0A'

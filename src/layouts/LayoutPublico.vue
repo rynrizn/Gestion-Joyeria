@@ -1,5 +1,6 @@
 <script setup>
 import { RouterView } from 'vue-router'
+import FooterCatalogo from '../components/common/FooterCatalogo.vue'
 </script>
 
 <template>
@@ -9,12 +10,8 @@ import { RouterView } from 'vue-router'
       <RouterView />
     </main>
 
-    <!-- Pie de página institucional simple -->
-    <footer class="footer-publico">
-      <div class="contenedor">
-        <p class="texto-copyright">Moonstone Joyería &copy; {{ new Date().getFullYear() }} &bull; Catálogo Digital</p>
-      </div>
-    </footer>
+    <!-- Pie de página con ubicación física, Google Maps y WhatsApp -->
+    <FooterCatalogo />
   </div>
 </template>
 
@@ -30,18 +27,5 @@ import { RouterView } from 'vue-router'
   flex: 1;
   display: flex;
   flex-direction: column;
-}
-
-.footer-publico {
-  border-top: 1px solid var(--color-neutral-200);
-  background-color: var(--color-blanco);
-  padding: 20px 0;
-  margin-top: auto;
-}
-
-.texto-copyright {
-  font-size: var(--tamano-caption);
-  color: var(--color-neutral-600);
-  text-align: center;
 }
 </style>
