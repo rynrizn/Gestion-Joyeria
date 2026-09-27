@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useClientesStore } from '../stores/clientes'
+import { useClientesStore, calcularTipoCliente } from '../stores/clientes'
 import { useProductosStore } from '../stores/productos'
 import { useReservasStore } from '../stores/reservas'
 import { useVentasStore } from '../stores/ventas'
@@ -33,7 +33,7 @@ const editNombre = ref('')
 const editTelefono = ref('')
 const editCI = ref('')
 const editCompras = ref(0)
-const editNotas = ref('')
+const editTipoCalculado = computed(() => calcularTipoCliente(editCompras.value))
 
 // Modal de Error / Feedback
 const modalErrorVisible = ref(false)
@@ -45,8 +45,8 @@ const modalErrorDetalles = ref('')
 const nuevoNombre = ref('')
 const nuevoTelefono = ref('')
 const nuevoCI = ref('')
-const nuevoTipo = ref('NUEVA')
-const nuevoNotas = ref('')
+const nuevoCompras = ref(0)
+const nuevoTipoCalculado = computed(() => calcularTipoCliente(nuevoCompras.value))
 
 // Formulario de Reserva Temporal
 const clienteReserva = ref(null)
@@ -58,8 +58,7 @@ const abrirModalNuevoCliente = () => {
   nuevoNombre.value = ''
   nuevoTelefono.value = ''
   nuevoCI.value = ''
-  nuevoTipo.value = 'NUEVA'
-  nuevoNotas.value = ''
+  nuevoCompras.value = 0
   modalNuevoClienteVisible.value = true
 }
 
@@ -105,8 +104,7 @@ const guardarNuevoCliente = () => {
     nombre: nuevoNombre.value,
     telefono: nuevoTelefono.value,
     ci: nuevoCI.value,
-    tipo: nuevoTipo.value,
-    notas: nuevoNotas.value,
+    cantidadCompras: Number(nuevoCompras.value || 0),
   })
 
   modalNuevoClienteVisible.value = false
@@ -126,7 +124,6 @@ const abrirModalEdicionCliente = (cliente) => {
   editTelefono.value = cliente.telefono || cliente.contacto_telefono || ''
   editCI.value = cliente.ci || ''
   editCompras.value = Number(cliente.cantidadCompras || 0)
-  editNotas.value = cliente.notas || ''
   modalEditarClienteVisible.value = true
 }
 
@@ -144,8 +141,7 @@ const guardarEdicionCliente = () => {
     telefono: editTelefono.value,
     contacto_telefono: editTelefono.value,
     ci: editCI.value,
-    cantidadCompras: Number(editCompras.value),
-    notas: editNotas.value,
+    cantidadCompras: Number(editCompras.value || 0),
   })
 
   modalEditarClienteVisible.value = false
@@ -254,19 +250,26 @@ const contactarWhatsApp = (cliente) => {
           />
         </div>
 
-        <div class="campo-select">
-          <label class="etiqueta-select">Nivel de confianza de la clienta</label>
-          <select v-model="nuevoTipo" class="control-select">
-            <option value="NUEVA">Cliente Nueva (Requiere pago total o seña)</option>
-            <option value="HABITUAL">Cliente Habitual (Permite reserva sin seña bajo palabra)</option>
-          </select>
+        <div class="campo-grupo">
+          <label class="etiqueta-campo">Compras Realizadas *</label>
+          <input
+            v-model.number="nuevoCompras"
+            type="number"
+            min="0"
+            class="input-control"
+            placeholder="0"
+            required
+          />
+          <div class="indicador-tipo-dinamico">
+            <span class="etiqueta-tipo-fija">Clasificación:</span>
+            <span
+              class="badge-tipo-calc"
+              :class="nuevoTipoCalculado === 'Habitual' ? 'habitual' : 'nuevo'"
+            >
+              {{ nuevoTipoCalculado }}
+            </span>
+          </div>
         </div>
-
-        <InputTexto
-          v-model="nuevoNotas"
-          etiqueta="Notas sobre gustos o preferencias"
-          placeholder="Ej. Le gustan las cadenas de acero dorado y piedras facetadas"
-        />
 
         <div class="acciones-modal">
           <button
@@ -473,7 +476,7 @@ const contactarWhatsApp = (cliente) => {
         </div>
 
         <div class="campo-grupo">
-          <label class="etiqueta-campo">Compras Realizadas (Ajuste Administradora) *</label>
+          <label class="etiqueta-campo">Compras Realizadas *</label>
           <input
             v-model.number="editCompras"
             type="number"
@@ -481,16 +484,16 @@ const contactarWhatsApp = (cliente) => {
             class="input-control"
             required
           />
-          <span class="ayuda-subtexto">
-            Tipo calculado: <strong>{{ editCompras > 1 ? 'Habitual (Mayor a 1 compra)' : 'Nuevo (0 a 1 compra)' }}</strong>
-          </span>
+          <div class="indicador-tipo-dinamico">
+            <span class="etiqueta-tipo-fija">Clasificación:</span>
+            <span
+              class="badge-tipo-calc"
+              :class="editTipoCalculado === 'Habitual' ? 'habitual' : 'nuevo'"
+            >
+              {{ editTipoCalculado }}
+            </span>
+          </div>
         </div>
-
-        <InputTexto
-          v-model="editNotas"
-          etiqueta="Notas sobre gustos o preferencias"
-          placeholder="Ej. Le gustan los aros mini y piercings plateados"
-        />
 
         <div class="acciones-modal">
           <button
@@ -694,6 +697,41 @@ const contactarWhatsApp = (cliente) => {
 
 .input-control:focus {
   border-color: var(--color-primario);
+}
+
+.indicador-tipo-dinamico {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.etiqueta-tipo-fija {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  font-weight: 500;
+}
+
+.badge-tipo-calc {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radio-sm);
+  letter-spacing: 0.3px;
+}
+
+.badge-tipo-calc.habitual {
+  background-color: var(--color-exito-fondo);
+  color: var(--color-exito);
+  border: 1px solid var(--color-exito-borde);
+}
+
+.badge-tipo-calc.nuevo {
+  background-color: var(--color-alerta-fondo);
+  color: var(--color-alerta);
+  border: 1px solid var(--color-alerta-borde);
 }
 
 .resumen-reserva-caja {
