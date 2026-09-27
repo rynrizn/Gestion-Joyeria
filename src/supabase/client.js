@@ -56,64 +56,106 @@ export const supabase = createClient(
  *
  * EJEMPLO A: Consultar el catálogo público (usando la vista SQL vw_catalogo_publico)
  * -----------------------------------------------------------------------------
+ * Filtra automáticamente productos con activo = true y stock disponible:
  * export async function cargarCatalogoReal() {
  *   const { data, error } = await supabase
  *     .from('vw_catalogo_publico')
- *     .select('*')
+ *     .select('id, nombre, categoria, material, color, talla, precio, stock_total, fotos, es_prioritario')
+ *     .order('es_prioritario', { ascending: false })
  *     .order('nombre', { ascending: true })
- *
- *   if (error) throw error
- *   return data // Array de piezas con stock total > 0 e imagen_portada
- * }
- *
- * EJEMPLO B: Consultar existencias multisede (usando la vista vw_inventario)
- * -----------------------------------------------------------------------------
- * export async function cargarInventarioMultisede() {
- *   const { data, error } = await supabase
- *     .from('vw_inventario')
- *     .select('*')
- *     .order('producto', { ascending: true })
- *
- *   if (error) throw error
- *   return data // Array con stock_central, stock_mercadito, stock_total y estado
- * }
- *
- * EJEMPLO C: Ejecutar Funciones Stored Procedure (RPC con BEGIN/COMMIT/ROLLBACK)
- * Para registrar una venta con múltiples productos y actualización atómica de stock:
- *
- * export async function registrarVentaReal({ idCliente, idSede, metodoPago, montoTotal, items, notas }) {
- *   const { data, error } = await supabase.rpc('crear_venta', {
- *     p_id_cliente: idCliente,
- *     p_id_sede: idSede,          // 1 = Central, 2 = Mercadito
- *     p_metodo_pago: metodoPago,  // 'EFECTIVO', 'QR', 'HIBRIDO'
- *     p_monto_total: montoTotal,
- *     p_items: items,             // JSON array: [{ id_producto, cantidad, precio_unitario }]
- *     p_notas: notas
- *   })
- *
- *   if (error) throw error
- *   return data // ID o folio de la venta generada
- * }
- *
- * EJEMPLO D: Traslado de Stock entre Sedes (RPC con validación de stock disponible)
- *
- * export async function trasladarStockReal({ idProducto, idOrigen, idDestino, cantidad, idUsuario, motivo }) {
- *   const { data, error } = await supabase.rpc('mover_stock', {
- *     p_id_producto: idProducto,
- *     p_origen: idOrigen,
- *     p_destino: idDestino,
- *     p_cantidad: cantidad,
- *     p_id_usuario: idUsuario,
- *     p_observacion: motivo
- *   })
  *
  *   if (error) throw error
  *   return data
  * }
  *
- * EJEMPLO E: Suscripción en Tiempo Real (WebSockets de Supabase)
- * Para que el Dashboard de la Dueña o Encargadas reciba nuevas reservas al instante:
+ * EJEMPLO B: Consultar existencias multisede (usando la vista vw_inventario)
+ * -----------------------------------------------------------------------------
+ * Muestra stock desglosado entre Central y Tienda física (Mercadito Creativo):
+ * export async function cargarInventarioMultisede() {
+ *   const { data, error } = await supabase
+ *     .from('vw_inventario')
+ *     .select('id, nombre, categoria, material, color, talla, stock_central, stock_tienda, stock_total, stock_minimo, precio, activo, es_prioritario')
+ *     .order('nombre', { ascending: true })
  *
+ *   if (error) throw error
+ *   return data
+ * }
+ *
+ * EJEMPLO C: Consultar clientas y fidelidad (usando la vista vw_historial_cliente)
+ * -----------------------------------------------------------------------------
+ * Muestra nombre, teléfono, cantidad de compras y clasificación (Nuevo / Habitual):
+ * export async function cargarClientesReal() {
+ *   const { data, error } = await supabase
+ *     .from('vw_historial_cliente')
+ *     .select('id, nombre, telefono, cantidad_compras, tipo, total_gastado, ultima_compra')
+ *     .order('nombre', { ascending: true })
+ *
+ *   if (error) throw error
+ *   return data
+ * }
+ *
+ * EJEMPLO D: Consultar reportes analíticos de ventas (vista vw_reporte_ventas)
+ * -----------------------------------------------------------------------------
+ * Exclusivo para Belen (Administradora):
+ * export async function cargarReporteVentasReal({ fechaInicio, fechaFin }) {
+ *   let consulta = supabase
+ *     .from('vw_reporte_ventas')
+ *     .select('id, fecha_hora, total, metodo_pago, vendedora, turno, items')
+ *     .order('fecha_hora', { ascending: false })
+ *
+ *   if (fechaInicio) consulta = consulta.gte('fecha_hora', fechaInicio)
+ *   if (fechaFin) consulta = consulta.lte('fecha_hora', fechaFin)
+ *
+ *   const { data, error } = await consulta
+ *   if (error) throw error
+ *   return data
+ * }
+ *
+ * EJEMPLO E: Ejecutar Funciones Stored Procedure (RPC con transacciones atómicas)
+ * -----------------------------------------------------------------------------
+ * 1. Registrar venta con múltiples productos y actualización atómica de existencias:
+ * export async function registrarVentaReal({ idCliente, idSede, metodoPago, montoTotal, items, notas }) {
+ *   const { data, error } = await supabase.rpc('crear_venta', {
+ *     p_id_cliente: idCliente,
+ *     p_id_sede: idSede,          // 1 = Central, 2 = Mercadito Creativo
+ *     p_metodo_pago: metodoPago,  // 'EFECTIVO', 'QR', 'HIBRIDO'
+ *     p_monto_total: montoTotal,
+ *     p_items: items,             // JSON array: [{ id_producto, cantidad, precio_unitario }]
+ *     p_notas: notas
+ *   })
+ *   if (error) throw error
+ *   return data
+ * }
+ *
+ * 2. Traslado de stock entre sedes con validación de existencia en origen:
+ * export async function trasladarStockReal({ idProducto, origen, destino, cantidad, idUsuario, motivo }) {
+ *   const { data, error } = await supabase.rpc('mover_stock', {
+ *     p_id_producto: idProducto,
+ *     p_origen: origen,           // 'central' o 'tienda'
+ *     p_destino: destino,         // 'tienda' o 'central'
+ *     p_cantidad: cantidad,
+ *     p_id_usuario: idUsuario,
+ *     p_observacion: motivo
+ *   })
+ *   if (error) throw error
+ *   return data
+ * }
+ *
+ * 3. Crear reserva automática para catálogo web:
+ * export async function crearReservaReal({ nombreCliente, telefono, items }) {
+ *   const { data, error } = await supabase.rpc('crear_reserva', {
+ *     p_cliente: nombreCliente,
+ *     p_telefono: telefono,
+ *     p_items: items,
+ *     p_horas_vigencia: 24
+ *   })
+ *   if (error) throw error
+ *   return data
+ * }
+ *
+ * EJEMPLO F: Suscripción en Tiempo Real (WebSockets de Supabase)
+ * -----------------------------------------------------------------------------
+ * Para que el Dashboard de Belen o Encargadas reciba nuevas reservas y ventas al instante:
  * export function suscribirReservas(callback) {
  *   return supabase
  *     .channel('canal-reservas-moonstone')
