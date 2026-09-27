@@ -1,102 +1,114 @@
-# Guía de Contribución - Moonstone (Gestión Joyería)
+# Guía de Contribución al Código
 
-¡Gracias por contribuir al proyecto **Moonstone / Gestión Joyería**! Para asegurar una colaboración fluida, organizada y alineada con la arquitectura establecida, por favor lee las siguientes pautas antes de comenzar a trabajar en el repositorio.
-
----
-
-## 1. Requisitos Previos y Entorno
-
-- **Node.js**: Versión LTS recomendada (>= 18.x o 20.x).
-- **Gestor de Paquetes**: Se utiliza **`pnpm`** de forma exclusiva. Por favor, no uses `npm` ni `yarn` para evitar inconsistencias en el archivo `pnpm-lock.yaml`.
-  ```bash
-  # Instalar dependencias
-  pnpm install
-
-  # Iniciar servidor de desarrollo local
-  pnpm dev
-
-  # Construir para producción
-  pnpm build
-
-  # Previsualizar compilación local
-  pnpm preview
-  ```
+¡Gracias por colaborar en el desarrollo de **Moonstone**! Esta guía contiene exclusivamente las indicaciones técnicas necesarias para preparar tu entorno local, trabajar en el código y enviar cambios siguiendo los estándares de arquitectura y calidad del proyecto.
 
 ---
 
-## 2. Variables de Entorno y Seguridad
+## 1. Requisitos Previos
 
-- **Desarrollo Local**:
-  - Copia `.env.example` a `.env`:
-    ```bash
-    cp .env.example .env
-    ```
-  - En Vite, todas las variables que deban exponerse en el cliente deben tener el prefijo **`VITE_`** (por ejemplo, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
-  - **NUNCA** subas el archivo `.env` ni expongas claves secretas (Service Role Keys) al repositorio. El archivo `.env` está expresamente excluido en `.gitignore`.
-
-- **Despliegue y Producción (Cloudflare Pages)**:
-  - En Cloudflare Pages no existe un archivo físico `.env`.
-  - Las variables se configuran en el panel de Cloudflare Pages (**Settings** ➔ **Environment variables**).
-  - Durante la ejecución de `pnpm build`, Vite toma esas variables del entorno y las inyecta en el cliente compilado.
+- **Node.js**: Versión LTS (>= 18.x o 20.x).
+- **Gestor de Paquetes**: **`pnpm`** (versión >= 8.x). Se utiliza exclusivamente `pnpm` para evitar inconsistencias en el archivo `pnpm-lock.yaml`.
 
 ---
 
-## 3. Normas de Arquitectura y Estilo
+## 2. Configuración del Entorno Local
 
-### 3.1. Gestión de Iconos con Morphicons
-- **Sin dependencias pesadas**: No instales librerías masivas de iconos vía `pnpm` (evita FontAwesome, Heroicons como dependencia npm, etc.).
-- **SVGs nativos**: Los iconos animados o estáticos deben descargarse desde [Morphicons](https://www.morphicons.com/) en formato SVG limpio.
-- **Ubicación**: Ubica todos los archivos SVG dentro de `src/assets/icons/` y consúmelos directamente como componentes o mediante etiquetas `<img>`.
+1. **Instalar dependencias del proyecto:**
+   ```bash
+   pnpm install
+   ```
 
-### 3.2. Estructura de Componentes y Vistas
-Respeta la separación de responsabilidades en el directorio `src/`:
-- `src/components/admin/`: Componentes exclusivos del panel de administración (formularios de productos, modales de venta, selectores de Cloudinary, tablas de reservas).
-- `src/components/catalogo/`: Componentes para la vitrina pública (buscador, filtros de categoría, tarjetas de joyas, modal de reserva).
-- `src/components/common/`: Componentes transversales reutilizables (Navbar, Footer, Badges).
-- `src/views/`: Vistas completas asociadas a rutas (`CatalogoPublico.vue`, `InventarioView.vue`, etc.).
-- `src/stores/`: Estado global con **Pinia** (`auth.js`, `productos.js`).
-- `src/supabase/`: Configuración y cliente de Supabase (`client.js`).
+2. **Configurar variables locales:**
+   Copia el archivo de plantilla `.env.example` y renómbralo a `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+   Define los valores de conexión a tu base de datos de desarrollo:
+   ```env
+   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=tu-clave-publica
+   ```
 
-### 3.3. Estilo de Código Vue
-- Utiliza la sintaxis moderna **Vue 3 SFC con `<script setup>`**.
-- Nombres de componentes en **PascalCase** (ej. `JoyaCard.vue`, `ModalReserva.vue`).
-- Mantén el código modular, legible y evita lógica acoplada innecesaria.
+3. **Iniciar el servidor de desarrollo:**
+   ```bash
+   pnpm dev
+   ```
 
----
-
-## 4. Flujo de Trabajo con Git
-
-### 4.1. Ramas de Trabajo
-Trabaja siempre sobre ramas temáticas basadas en la rama principal (`main` o `develop` según corresponda):
-- `feat/<nombre-de-la-funcionalidad>`: Para nuevas características (ej. `feat/catalogo-filtros`).
-- `fix/<descripcion-del-arreglo>`: Para resolución de bugs (ej. `fix/reserva-modal-fechas`).
-- `docs/<tema>`: Para modificaciones o creación de documentación.
-- `refactor/<modulo>`: Para mejoras de código sin cambios de funcionalidad.
-- `chore/<tarea>`: Para configuración de herramientas, dependencias o mantenimiento.
-
-### 4.2. Convención de Commits (Conventional Commits)
-Redacta mensajes de commit descriptivos y claros siguiendo el estándar:
-- `feat: agregar selector de imágenes con Cloudinary`
-- `fix: corregir validación de stock al registrar venta mostrador`
-- `docs: actualizar instrucciones de despliegue en README`
-- `style: mejorar espaciados y tipografía en NavbarApp`
-- `refactor: optimizar consulta de productos en store`
-
----
-
-## 5. Proceso de Pull Requests (PR)
-
-1. Asegúrate de que el proyecto compila localmente sin errores:
+4. **Verificar compilación local:**
    ```bash
    pnpm build
    ```
-2. Realiza push a tu rama remota:
+
+---
+
+## 3. Estructura de Capas y Código
+
+El proyecto sigue una arquitectura en capas reflejada en la distribución del directorio `src/`:
+
+```text
+src/
+├── assets/                  # Estilos globales (global.css) y recursos
+├── components/              # Capa de presentación (componentes reutilizables)
+│   ├── admin/               # Módulos del panel (inventario, POS, reportes, clientes)
+│   ├── catalogo/            # Módulos de la vitrina pública (tarjetas, buscador, filtros)
+│   └── common/              # Componentes base (botones, modales, badges, inputs)
+├── router/                  # Definición de rutas y navegación
+├── stores/                  # Capa de negocio y estado global (Pinia)
+│   ├── auth.js              # Sesión y roles de usuarias
+│   ├── clientes.js          # Gestión y fidelización de clientas
+│   ├── inventario.js        # Existencias por sede y traslados
+│   ├── productos.js         # Catálogo público y piezas
+│   ├── reservas.js          # Control de pedidos y reservas
+│   └── ventas.js            # Registro de ventas en mostrador
+├── supabase/                # Cliente y conectores de Supabase
+└── views/                   # Vistas principales de la aplicación
+```
+
+---
+
+## 4. Estándares y Convenciones de Código
+
+- **Vue 3 SFC:** Todo componente debe utilizar la sintaxis `<script setup>` y Composition API.
+- **Nomenclatura:**
+  - Componentes en **PascalCase** (ej. `TarjetaJoya.vue`, `TablaInventario.vue`).
+  - Stores en **camelCase** dentro de `src/stores/`.
+- **Separación de Responsabilidades:**
+  - La lógica de negocio, cálculos de stock y mutaciones de datos deben residir en los **stores de Pinia**.
+  - Los componentes de la interfaz de usuario deben limitarse a presentar datos y emitir eventos.
+- **Estilos:** Emplea CSS scoped en cada componente y reutiliza las variables CSS de diseño definidas en `src/assets/styles/global.css`.
+
+---
+
+## 5. Flujo de Trabajo con Git
+
+### 5.1. Ramas de Trabajo
+Trabaja siempre sobre ramas temáticas creadas a partir de la rama principal `main`:
+- `feat/<nombre>`: Para nuevas funcionalidades (ej. `feat/filtro-material`).
+- `fix/<nombre>`: Para corrección de errores (ej. `fix/calculo-vuelto-pos`).
+- `refactor/<nombre>`: Para optimizaciones sin cambio funcional.
+- `chore/<nombre>`: Para mantenimiento o actualización de dependencias.
+
+### 5.2. Convención de Mensajes de Commit
+Aplica el estándar de **Conventional Commits**:
+- `feat: agregar buscador por código en inventario`
+- `fix: corregir validación de existencias al vender desde tienda`
+- `refactor: modularizar funciones del store de ventas`
+- `style: ajustar espaciados en la tabla de reportes`
+
+---
+
+## 6. Proceso de Envío (Pull Request)
+
+1. **Compilación obligatoria sin errores:**
+   Antes de hacer commit o abrir un PR, confirma que el proyecto compile limpiamente:
+   ```bash
+   pnpm build
+   ```
+2. **Subir tu rama al repositorio remoto:**
    ```bash
    git push origin feat/<nombre-rama>
    ```
-3. Abre un **Pull Request** hacia la rama base designada.
-4. En la descripción del PR, incluye:
-   - Resumen de los cambios implementados.
-   - Issue o tarea que resuelve (ej. `Closes #12`).
-   - Capturas de pantalla o GIFs si involucra cambios de interfaz gráfica (UI).
-5. Espera la revisión y aprobación de al menos un revisor del equipo antes de integrar los cambios.
+3. **Crear el Pull Request:**
+   - Describe con claridad el propósito del cambio y los archivos modificados.
+   - Adjunta capturas o demostración visual si modificaste la interfaz gráfica.
+   - Espera la revisión y aprobación antes de fusionar los cambios.

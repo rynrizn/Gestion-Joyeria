@@ -1,167 +1,51 @@
-# Moonstone — Sistema de Gestión y Catálogo para Joyería
+# Moonstone — Gestor de Inventario para Joyería
 
-Sistema integral y modular desarrollado con **Vue 3**, **Vite** y **Supabase**, diseñado para la administración de inventario, registro de reservas, ventas en mostrador y exhibición de catálogo digital de alta disponibilidad.
+Sistema integral de gestión de inventario y punto de venta diseñado para **Moonstone Joyería**, optimizado para el control de existencias multisede, registro de ventas físicas en mostrador y exhibición de catálogo digital para clientas.
 
-El diseño sigue una estética minimalista, profesional y enfocada en la usabilidad, priorizando el rendimiento, la escalabilidad y una experiencia de usuario fluida tanto en dispositivos móviles como en terminales de escritorio.
+El proyecto está diseñado bajo una **arquitectura en capas**, separando la presentación visual, la lógica de negocio reactiva y la persistencia de datos relacional para garantizar consistencia transaccional, modularidad y escalabilidad.
 
 ---
 
-## Características Principales
+## Resumen del Sistema
 
-### 1. Catálogo Público y Reservas
-- **Exploración de Productos**: Visualización de piezas disponibles con fichas técnicas detalladas y estados de stock.
-- **Buscador y Filtrado Dinámico**: Búsqueda en tiempo real por nombre, código y categorías.
-- **Flujo de Reserva**: Interfaz para que clientes seleccionen piezas y soliciten reservas sin intermediarios manuales.
+- **Control de Inventario Multisede:** Administración detallada de existencias desglosadas entre almacén Central (dueña) y tienda física (Mercadito Creativo), con alertas automáticas de stock bajo y traslados seguros entre sedes.
+- **Punto de Venta (POS):** Registro de ventas en mostrador con selección inteligente del origen de stock (Central, Tienda o Ambos), soporte para pagos en efectivo, QR o híbridos (combinados), y cálculo automático de descuentos.
+- **Catálogo Digital Público:** Vitrina virtual moderna para clientas con filtros por categorías, buscador en tiempo real, fichas técnicas y enlace directo a WhatsApp e Instagram oficial.
+- **Gestión de Clientas y Fidelidad:** Registro de clientas, historial acumulado de compras y clasificación automática de fidelidad (Nueva o Habitual).
+- **Tablero de Pedidos y Reservas:** Seguimiento de piezas reservadas con contador de vencimiento horario y verificación de disponibilidad física por sede.
+- **Reportes Analíticos:** Resumen de balance de ingresos, desglose por métodos de pago y métricas de desempeño por vendedora y turno.
 
-### 2. Panel Administrativo (Back-Office)
-- **Gestión de Inventario**: Altas, bajas, modificaciones y control de existencias de piezas de joyería.
-- **Integración Multimedia**: Carga y optimización de imágenes alojadas en Cloudinary.
-- **Punto de Venta / Venta en Mostrador**: Registro ágil de ventas físicas directas y cierre de operaciones.
-- **Tablero de Reservas**: Control de estado de reservas activas, pendientes, entregadas o canceladas.
-- **Métricas y Reportes**: Visualización de balance de ventas y rotación de stock.
+---
 
-### 3. Arquitectura y Rendimiento
-- **Gestión de Estado Centralizada**: Implementación con Pinia para sesiones, productos y reservas.
-- **Backend as a Service (BaaS)**: Supabase provee autenticación segura, persistencia relacional en PostgreSQL y suscripciones en tiempo real.
-- **Iconografía Liviana**: Integración nativa de SVG mediante Morphicons sin librerías dependientes en `node_modules`.
-- **Despliegue Continuo**: Preparado para compilación estática y distribución global en Cloudflare Pages.
+## Arquitectura
+
+El sistema implementa una **Arquitectura en Capas**:
+1. **Capa de Presentación:** Componentes desacoplados en Vue 3 organizados por módulos funcionales (`admin`, `catalogo`, `common`) y vistas completas.
+2. **Capa de Negocio y Estado:** Stores modulares con Pinia que centralizan reglas de negocio, validaciones y reactividad global.
+3. **Capa de Persistencia y Datos:** Base de datos relacional PostgreSQL con vistas optimizadas, procedimientos almacenados (RPC) para transacciones atómicas y políticas RLS (Row Level Security).
 
 ---
 
 ## Stack Tecnológico
 
-| Capa | Tecnología | Propósito |
-| :--- | :--- | :--- |
-| **Framework UI** | [Vue 3](https://vuejs.org/) (Composition API, `<script setup>`) | Construcción reactiva de interfaces y componentes |
-| **Bundler / Tooling** | [Vite](https://vitejs.dev/) | Entorno de compilación ultra-rápido y HMR |
-| **Enrutamiento** | [Vue Router](https://router.vuejs.org/) | Gestión de rutas públicas y protegidas |
-| **Gestión de Estado** | [Pinia](https://pinia.vuejs.org/) | Almacenamiento y reactividad global de datos |
-| **Backend & Base de Datos** | [Supabase](https://supabase.com/) | Autenticación, base de datos PostgreSQL y políticas RLS |
-| **Gestión Multimedia** | [Cloudinary](https://cloudinary.com/) | Optimización y entrega de imágenes en CDN |
-| **Iconografía** | [Morphicons](https://www.morphicons.com/) | Iconos SVG nativos y animaciones livianas |
-| **Despliegue** | [Cloudflare Pages](https://pages.cloudflare.com/) | CDN global y CI/CD automatizado |
-
----
-
-## Estructura del Proyecto
-
-```text
-Gestion-Joyeria/
-├── .env.example                         # Plantilla documentada de variables de entorno
-├── .gitignore                           # Exclusiones de Git (seguridad y compilación)
-├── CONTRIBUTING.md                      # Guía de estilo, ramas y flujo de contribución
-├── README.md                            # Documentación general del proyecto
-├── index.html                           # Punto de entrada HTML
-├── package.json                         # Dependencias y scripts
-├── pnpm-lock.yaml                       # Bloqueo de versiones reproducible
-├── vite.config.js                       # Configuración de compilación Vite
-└── src/
-    ├── assets/
-    │   ├── icons/                       # Archivos SVG nativos (Morphicons)
-    │   └── styles/
-    │       └── main.css                 # Estilos globales y variables de diseño
-    ├── components/
-    │   ├── admin/                       # Componentes del módulo de administración
-    │   │   ├── FormProducto.vue
-    │   │   ├── ModalCerrarVenta.vue
-    │   │   ├── ModalVentaMostrador.vue
-    │   │   ├── SelectorCloudinary.vue
-    │   │   └── TablaReservas.vue
-    │   ├── catalogo/                    # Componentes del módulo de catálogo público
-    │   │   ├── Buscador.vue
-    │   │   ├── FiltrosCategoria.vue
-    │   │   ├── JoyaCard.vue
-    │   │   └── ModalReserva.vue
-    │   └── common/                      # Componentes transversales reutilizables
-    │       ├── BadgeEstado.vue
-    │       ├── FooterApp.vue
-    │       └── NavbarApp.vue
-    ├── router/
-    │   └── index.js                     # Configuración de rutas y guards de navegación
-    ├── stores/
-    │   ├── auth.js                      # Store de autenticación y sesión
-    │   └── productos.js                 # Store de productos y catálogo
-    ├── supabase/
-    │   └── client.js                    # Inicialización del cliente Supabase
-    ├── views/                           # Vistas completas de la aplicación
-    │   ├── CatalogoPublico.vue
-    │   ├── InventarioView.vue
-    │   ├── LoginView.vue
-    │   ├── ReportesView.vue
-    │   └── ReservasDashboard.vue
-    ├── App.vue                          # Componente raíz
-    └── main.js                          # Bootstrap de la aplicación Vue
-```
-
----
-
-## Inicio Rápido
-
-### Requisitos Previos
-
-- **Node.js** v18.0 o superior
-- **pnpm** v8.0 o superior (`npm install -g pnpm`)
-
-### Instalación y Ejecución
-
-1. **Clonar el repositorio e ingresar al directorio:**
-   ```bash
-   git clone <URL_DEL_REPOSITORIO>
-   cd Gestion-Joyeria
-   ```
-
-2. **Instalar dependencias con pnpm:**
-   ```bash
-   pnpm install
-   ```
-
-3. **Configurar variables de entorno:**
-   Copia la plantilla `.env.example` y renómbrala a `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-   Define los valores correspondientes a tu proyecto de Supabase y Cloudinary:
-   ```env
-   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-   VITE_SUPABASE_ANON_KEY=tu-anon-key-publica
-   VITE_CLOUDINARY_CLOUD_NAME=tu_cloud_name
-   VITE_CLOUDINARY_UPLOAD_PRESET=tu_upload_preset
-   ```
-
-4. **Iniciar el servidor de desarrollo:**
-   ```bash
-   pnpm dev
-   ```
-
-5. **Construir para producción:**
-   ```bash
-   pnpm build
-   ```
-
-6. **Previsualizar la compilación de producción:**
-   ```bash
-   pnpm preview
-   ```
-
----
-
-## Despliegue en Cloudflare Pages
-
-1. Vincula el repositorio de Git en el panel de **Cloudflare Pages**.
-2. Parámetros de compilación:
-   - **Framework preset**: `Vite`
-   - **Build command**: `pnpm build`
-   - **Build output directory**: `dist`
-3. En **Settings** ➔ **Environment variables**, agrega `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, y demás credenciales públicas requeridas por la aplicación en tiempo de ejecución.
+| Tecnología | Justificación de Elección |
+| :--- | :--- |
+| **[Vue 3](https://vuejs.org/)** | Reactividad nativa de alto rendimiento, modularidad y legibilidad con Composition API (`<script setup>`). |
+| **[Vite](https://vitejs.dev/)** | Entorno de desarrollo ultra-rápido, arranque inmediato y compilación optimizada para producción. |
+| **[Pinia](https://pinia.vuejs.org/)** | Gestión de estado predecible, tipada y modular sin la complejidad innecesaria de librerías tradicionales. |
+| **[Vue Router](https://router.vuejs.org/)** | Enrutamiento SPA fluido con guards de navegación para proteger las áreas administrativas. |
+| **[Supabase (PostgreSQL)](https://supabase.com/)** | Persistencia relacional robusta con cumplimiento ACID, transacciones atómicas mediante RPC y seguridad RLS. |
+| **[Chart.js](https://www.chartjs.org/)** | Renderizado ligero y dinámico de métricas para reportes y balances sin penalizar la velocidad de carga. |
+| **[Lucide Icons](https://lucide.dev/)** | Iconografía SVG consistente, accesible y de bajo impacto visual en la aplicación. |
 
 ---
 
 ## Contribución
 
-Consulta la guía detallada en [CONTRIBUTING.md](./CONTRIBUTING.md) para conocer las directrices de código, convención de ramas (`feat/`, `fix/`, `chore/`) y el formato de mensajes de confirmación (Conventional Commits).
+Si deseas colaborar en el desarrollo de la aplicación, consulta las directrices de código, estructura de carpetas y flujo de trabajo en [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ---
 
 ## Licencia
 
-Distribuido bajo la Licencia MIT. Consulta el archivo [LICENSE](./LICENSE) para más información.
+Distribuido bajo la Licencia MIT. Consulta [LICENSE](./LICENSE) para más información.
