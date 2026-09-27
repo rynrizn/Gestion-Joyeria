@@ -36,13 +36,25 @@ onUnmounted(() => {
   document.body.style.overflow = ''
 })
 
-const pedirPorWhatsApp = () => {
-  // 1. Generar reserva temporal automática (24h) para que la dueña la gestione desde el dashboard
-  reservasStore.crearReservaDesdeCarrito(carrito.items, carrito.subtotal)
+const pedirPorWhatsApp = async () => {
+  if (carrito.estaVacio) return
 
-  // 2. Abrir WhatsApp con el pedido formateado
+  // 1. Obtener la URL de WhatsApp antes de vaciar el carrito
   const url = carrito.generarEnlaceWhatsApp()
+
+  // 2. Generar reserva temporal automática (24h) para que la dueña la gestione desde el dashboard
+  try {
+    await reservasStore.crearReservaDesdeCarrito(carrito.items, carrito.subtotal)
+  } catch (err) {
+    console.warn('Error al registrar reserva:', err)
+  }
+
+  // 3. Abrir WhatsApp con el pedido formateado
   window.open(url, '_blank')
+
+  // 4. Vaciar carrito y cerrar drawer para evitar pedidos duplicados
+  carrito.vaciarCarrito()
+  carrito.cerrarCarrito()
 }
 </script>
 
@@ -84,6 +96,7 @@ const pedirPorWhatsApp = () => {
               v-for="item in carrito.items"
               :key="item.producto.id"
               :item="item"
+              :al-maximo="carrito.estaAlMaximo(item.producto.id)"
               @incrementar="carrito.actualizarCantidad(item.producto.id, item.cantidad + 1)"
               @decrementar="carrito.actualizarCantidad(item.producto.id, item.cantidad - 1)"
               @eliminar="carrito.quitarProducto(item.producto.id)"

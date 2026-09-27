@@ -6,6 +6,10 @@ defineProps({
     type: Object,
     required: true,
   },
+  alMaximo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 defineEmits(['incrementar', 'decrementar', 'eliminar'])
@@ -26,24 +30,33 @@ defineEmits(['incrementar', 'decrementar', 'eliminar'])
       <span class="precio-unitario">Bs. {{ item.producto.precio_venta }} c/u</span>
 
       <!-- Control de Cantidad -->
-      <div class="control-cantidad">
-        <button
-          type="button"
-          class="boton-cantidad"
-          aria-label="Disminuir cantidad"
-          @click="$emit('decrementar')"
-        >
-          <IconoLucide nombre="Minus" :tamano="14" />
-        </button>
-        <span class="numero-cantidad">{{ item.cantidad }}</span>
-        <button
-          type="button"
-          class="boton-cantidad"
-          aria-label="Aumentar cantidad"
-          @click="$emit('incrementar')"
-        >
-          <IconoLucide nombre="Plus" :tamano="14" />
-        </button>
+      <div class="fila-control-stock">
+        <div class="control-cantidad">
+          <button
+            type="button"
+            class="boton-cantidad"
+            aria-label="Disminuir cantidad"
+            @click="$emit('decrementar')"
+          >
+            <IconoLucide nombre="Minus" :tamano="14" />
+          </button>
+          <span class="numero-cantidad">{{ item.cantidad }}</span>
+          <button
+            type="button"
+            class="boton-cantidad"
+            :class="{ 'boton-deshabilitado': alMaximo }"
+            :disabled="alMaximo"
+            :title="alMaximo ? 'Stock máximo disponible alcanzado' : 'Aumentar cantidad'"
+            aria-label="Aumentar cantidad"
+            @click="$emit('incrementar')"
+          >
+            <IconoLucide nombre="Plus" :tamano="14" />
+          </button>
+        </div>
+
+        <span v-if="alMaximo" class="badge-max-stock" title="Límite de unidades disponibles alcanzado">
+          Máx stock
+        </span>
       </div>
     </div>
 
@@ -102,6 +115,13 @@ defineEmits(['incrementar', 'decrementar', 'eliminar'])
   color: var(--color-neutral-600);
 }
 
+.fila-control-stock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .control-cantidad {
   display: inline-flex;
   align-items: center;
@@ -109,7 +129,6 @@ defineEmits(['incrementar', 'decrementar', 'eliminar'])
   border-radius: var(--radio-sm);
   background-color: var(--color-neutral-50);
   width: fit-content;
-  margin-top: 2px;
 }
 
 .boton-cantidad {
@@ -122,9 +141,25 @@ defineEmits(['incrementar', 'decrementar', 'eliminar'])
   transition: all var(--transicion-rapida);
 }
 
-.boton-cantidad:hover {
+.boton-cantidad:hover:not(:disabled) {
   background-color: var(--color-neutral-200);
   color: var(--color-neutral-900);
+}
+
+.boton-cantidad:disabled,
+.boton-cantidad.boton-deshabilitado {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.badge-max-stock {
+  font-size: 10px;
+  font-weight: 700;
+  color: #B45309;
+  background-color: #FEF3C7;
+  padding: 2px 6px;
+  border-radius: var(--radio-sm);
+  border: 1px solid #FDE68A;
 }
 
 .numero-cantidad {

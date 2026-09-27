@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReservasStore, calcularDisponibilidadPedido } from '../stores/reservas'
 import { useInventarioStore } from '../stores/inventario'
@@ -13,6 +13,44 @@ const router = useRouter()
 const reservasStore = useReservasStore()
 const inventarioStore = useInventarioStore()
 const ventasStore = useVentasStore()
+
+// Estado para recarga de datos en segundo plano
+const recargando = ref(false)
+
+const recargarDatos = async () => {
+  recargando.value = true
+  try {
+    await Promise.allSettled([
+      reservasStore.cargarReservasSupabase(),
+      inventarioStore.cargarInventarioSupabase(),
+    ])
+  } finally {
+    setTimeout(() => {
+      recargando.value = false
+    }, 400)
+  }
+}
+
+let intervaloActualizacion = null
+
+onMounted(async () => {
+  await recargarDatos()
+
+  // Recarga automática periódica (cada 20s) para mostrar nuevos pedidos web en tiempo real
+  intervaloActualizacion = setInterval(() => {
+    reservasStore.cargarReservasSupabase()
+  }, 20000)
+
+  // Recargar al regresar a la pestaña del navegador
+  window.addEventListener('focus', recargarDatos)
+})
+
+onUnmounted(() => {
+  if (intervaloActualizacion) {
+    clearInterval(intervaloActualizacion)
+  }
+  window.removeEventListener('focus', recargarDatos)
+})
 
 // Estado para modal de detalle de pedido
 const modalDetalleVisible = ref(false)
@@ -42,11 +80,13 @@ const solicitarLiberarReserva = (reserva) => {
 }
 
 // Confirmar liberación en el modal
-const ejecutarLiberacionReserva = () => {
+const ejecutarLiberacionReserva = async () => {
   if (reservaSeleccionadaParaLiberar.value) {
-    reservasStore.liberarReserva(reservaSeleccionadaParaLiberar.value.id)
+    await reservasStore.liberarReserva(reservaSeleccionadaParaLiberar.value.id)
     modalLiberarVisible.value = false
     reservaSeleccionadaParaLiberar.value = null
+    // Refrescar inventario para ver las piezas liberadas
+    inventarioStore.cargarInventarioSupabase()
   }
 }
 
@@ -69,14 +109,27 @@ const contactarWhatsApp = (reserva) => {
         </p>
       </div>
 
-      <!-- Selector de Turno de Tienda -->
-      <div class="selector-turno-caja">
-        <IconoLucide nombre="Clock" :tamano="16" />
-        <span class="etiqueta-turno">Turno activo:</span>
-        <select v-model="ventasStore.turnoActual" class="select-turno">
-          <option value="Turno Mañana">Turno Mañana</option>
-          <option value="Turno Tarde">Turno Tarde</option>
-        </select>
+      <!-- Acciones de Cabecera: Botón Recargar y Selector de Turno -->
+      <div class="acciones-cabecera">
+        <button
+          type="button"
+          class="boton-recargar-dashboard"
+          :class="{ 'girando': recargando }"
+          title="Actualizar pedidos y reservas desde Supabase"
+          @click="recargarDatos"
+        >
+          <IconoLucide nombre="RefreshCw" :tamano="15" />
+          <span>{{ recargando ? 'Actualizando...' : 'Actualizar' }}</span>
+        </button>
+
+        <div class="selector-turno-caja">
+          <IconoLucide nombre="Clock" :tamano="16" />
+          <span class="etiqueta-turno">Turno:</span>
+          <select v-model="ventasStore.turnoActual" class="select-turno">
+            <option value="Turno Mañana">Turno Mañana</option>
+            <option value="Turno Tarde">Turno Tarde</option>
+          </select>
+        </div>
       </div>
     </header>
 
@@ -286,6 +339,48 @@ const contactarWhatsApp = (reserva) => {
 .subtitulo-vista {
   font-size: var(--tamano-cuerpo);
   color: var(--color-neutral-600);
+}
+
+.acciones-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.boton-recargar-dashboard {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--color-blanco);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radio-md);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  cursor: pointer;
+  box-shadow: var(--sombra-sutil);
+  transition: all var(--transicion-rapida);
+}
+
+.boton-recargar-dashboard:hover {
+  background-color: var(--color-neutral-50);
+  border-color: var(--color-neutral-300);
+  color: var(--color-primario);
+}
+
+.boton-recargar-dashboard.girando svg {
+  animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .selector-turno-caja {

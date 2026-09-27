@@ -22,10 +22,36 @@ export const useCarritoStore = defineStore('carrito', () => {
 
   const estaVacio = computed(() => items.value.length === 0)
 
-  // Agregar joya al carrito
+  // Helper para obtener el stock total disponible de un producto
+  const obtenerStockDisponible = (producto) => {
+    if (!producto) return 0
+    if (producto.stock !== undefined && producto.stock !== null) {
+      return Number(producto.stock)
+    }
+    const central = Number(producto.stockCentral || 0)
+    const tienda = Number(producto.stockTienda || 0)
+    return central + tienda
+  }
+
+  // Verificar si un producto en el carrito ya alcanzó el tope de stock disponible
+  const estaAlMaximo = (idProducto) => {
+    const item = items.value.find((i) => i.producto.id === idProducto)
+    if (!item) return false
+    const stockMax = obtenerStockDisponible(item.producto)
+    return item.cantidad >= stockMax
+  }
+
+  // Agregar joya al carrito respetando el stock disponible
   const agregarProducto = (producto) => {
+    const stockMax = obtenerStockDisponible(producto)
+    if (stockMax <= 0) return false
+
     const itemExistente = items.value.find((i) => i.producto.id === producto.id)
     if (itemExistente) {
+      if (itemExistente.cantidad >= stockMax) {
+        estaAbierto.value = true
+        return false // Ya alcanzó el stock máximo disponible
+      }
       itemExistente.cantidad += 1
     } else {
       items.value.push({
@@ -35,6 +61,7 @@ export const useCarritoStore = defineStore('carrito', () => {
     }
     // Abre automáticamente el carrito para feedback visual
     estaAbierto.value = true
+    return true
   }
 
   // Quitar joya por su ID
@@ -42,7 +69,7 @@ export const useCarritoStore = defineStore('carrito', () => {
     items.value = items.value.filter((i) => i.producto.id !== idProducto)
   }
 
-  // Actualizar cantidad directa
+  // Actualizar cantidad directa asegurando no exceder el stock
   const actualizarCantidad = (idProducto, nuevaCantidad) => {
     if (nuevaCantidad <= 0) {
       quitarProducto(idProducto)
@@ -50,7 +77,8 @@ export const useCarritoStore = defineStore('carrito', () => {
     }
     const item = items.value.find((i) => i.producto.id === idProducto)
     if (item) {
-      item.cantidad = nuevaCantidad
+      const stockMax = obtenerStockDisponible(item.producto)
+      item.cantidad = Math.min(nuevaCantidad, Math.max(stockMax, 1))
     }
   }
 
@@ -71,6 +99,9 @@ export const useCarritoStore = defineStore('carrito', () => {
   const generarEnlaceWhatsApp = (telefono = CONFIG_NEGOCIO.whatsappNumero) => {
     if (estaVacio.value) return '#'
 
+    // Sanitizar número quitando espacios, signos + y guiones
+    const telLimpio = String(telefono || '').replace(/[\s+\-()]/g, '')
+
     let mensaje = '¡Hola Moonstone Joyería! Deseo coordinar la compra de las siguientes joyas de su catálogo:%0A%0A'
 
     items.value.forEach((item, index) => {
@@ -82,7 +113,7 @@ export const useCarritoStore = defineStore('carrito', () => {
 
     mensaje += `%0A*Total Estimado: Bs. ${subtotal.value}*%0A%0A¿Tienen disponibilidad para coordinar el pago y retiro/envío? Muchas gracias.`
 
-    return `https://wa.me/${telefono}?text=${mensaje}`
+    return `https://wa.me/${telLimpio}?text=${mensaje}`
   }
 
   return {
@@ -91,6 +122,8 @@ export const useCarritoStore = defineStore('carrito', () => {
     totalItems,
     subtotal,
     estaVacio,
+    obtenerStockDisponible,
+    estaAlMaximo,
     agregarProducto,
     quitarProducto,
     actualizarCantidad,
