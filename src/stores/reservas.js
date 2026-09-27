@@ -191,13 +191,24 @@ export const enriquecerItemsReserva = (reserva, inventarioProductos = []) => {
 }
 
 export const useReservasStore = defineStore('reservas', () => {
+  const esDatoDePrueba = (lista) => {
+    if (!Array.isArray(lista) || lista.length === 0) return false
+    return lista.some((r) => r.cliente === 'María López' || r.cliente === 'Ana García')
+  }
+
   const cargarInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_RESERVAS)
-      return guardado ? JSON.parse(guardado) : RESERVAS_DEFECTO
-    } catch {
-      return RESERVAS_DEFECTO
-    }
+      if (guardado) {
+        const arr = JSON.parse(guardado)
+        if (isSupabaseConfigured && esDatoDePrueba(arr)) {
+          localStorage.removeItem(CLAVE_RESERVAS)
+          return []
+        }
+        return arr
+      }
+    } catch {}
+    return isSupabaseConfigured ? [] : RESERVAS_DEFECTO
   }
 
   const reservas = ref(cargarInicial())
@@ -238,7 +249,7 @@ export const useReservasStore = defineStore('reservas', () => {
         .select('*')
         .order('fecha_limite', { ascending: true })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data !== null && data !== undefined) {
         reservas.value = data.map((r) => {
           const fechaLimiteMs = r.fecha_limite ? new Date(r.fecha_limite).getTime() : (Date.now() + 24 * 3600 * 1000)
           const horasRestantes = Math.max(0, Math.round((fechaLimiteMs - Date.now()) / (3600 * 1000)))

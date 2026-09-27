@@ -127,13 +127,24 @@ const ITEMS_INICIALES = [
 ]
 
 export const useInventarioStore = defineStore('inventario', () => {
+  const esDatoDePrueba = (lista) => {
+    if (!Array.isArray(lista) || lista.length === 0) return false
+    return lista.some((p) => p.nombre === 'Aros Mini Serpiente Regulable' || p.nombre === 'Earcuff Luna Moonstone')
+  }
+
   const cargarInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_INVENTARIO)
-      return guardado ? JSON.parse(guardado) : ITEMS_INICIALES
-    } catch {
-      return ITEMS_INICIALES
-    }
+      if (guardado) {
+        const arr = JSON.parse(guardado)
+        if (isSupabaseConfigured && esDatoDePrueba(arr)) {
+          localStorage.removeItem(CLAVE_INVENTARIO)
+          return []
+        }
+        return arr
+      }
+    } catch {}
+    return isSupabaseConfigured ? [] : ITEMS_INICIALES
   }
 
   const items = ref(cargarInicial())
@@ -195,7 +206,7 @@ export const useInventarioStore = defineStore('inventario', () => {
   })
 
   // Trasladar unidades entre Central (Dueña) y Tienda (Mercadito Creativo)
-  const moverStock = (idProducto, origen, destino, cantidad) => {
+  const moverStock = async (idProducto, origen, destino, cantidad) => {
     const joya = items.value.find((i) => i.id === idProducto)
     if (!joya || cantidad <= 0) return false
 
@@ -203,16 +214,32 @@ export const useInventarioStore = defineStore('inventario', () => {
       if (joya.stockCentral < cantidad) return false
       joya.stockCentral -= cantidad
       joya.stockTienda += cantidad
-      guardarEnStorage()
-      return true
     } else if (origen === 'tienda' && destino === 'central') {
       if (joya.stockTienda < cantidad) return false
       joya.stockTienda -= cantidad
       joya.stockCentral += cantidad
-      guardarEnStorage()
-      return true
+    } else {
+      return false
     }
-    return false
+
+    guardarEnStorage()
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.rpc('mover_stock', {
+          p_id_producto: joya.id,
+          p_origen: origen === 'central' ? 1 : 2,
+          p_destino: destino === 'central' ? 1 : 2,
+          p_cantidad: cantidad,
+          p_id_usuario: 1,
+          p_observacion: `Traslado de ${origen} a ${destino} desde la web`,
+        })
+      } catch (e) {
+        console.warn('ℹ️ [Supabase mover_stock]:', e)
+      }
+    }
+
+    return true
   }
 
   // Alta de nuevo producto (Solo Administradora)
@@ -306,11 +333,12 @@ export const useInventarioStore = defineStore('inventario', () => {
         const { data: dataProd, error: errProd } = await supabase
           .from('producto')
           .select('*')
-        if (errProd) throw errProd
-        lista = dataProd
+        if (!errProd && dataProd) {
+          lista = dataProd
+        }
       }
 
-      if (lista && lista.length > 0) {
+      if (lista !== null && lista !== undefined) {
         items.value = lista.map((p) => ({
           id: p.id_producto || p.id,
           nombre: p.nombre,

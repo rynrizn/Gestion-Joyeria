@@ -75,15 +75,15 @@ const abrirTraslado = (joya) => {
   modalTrasladoVisible.value = true
 }
 
-const guardarNuevaJoya = (datos) => {
-  inventarioStore.agregarProducto(datos)
-  productosStore.agregarProducto(datos)
+const guardarNuevaJoya = async (datos) => {
+  const prod = await productosStore.agregarProducto(datos)
+  inventarioStore.agregarProducto({ ...datos, id: prod?.id })
   modalAltaVisible.value = false
 }
 
-const guardarEdicionJoya = (datos) => {
+const guardarEdicionJoya = async (datos) => {
+  await productosStore.actualizarProducto(datos.id, datos)
   inventarioStore.actualizarProducto(datos.id, datos)
-  productosStore.actualizarProducto(datos.id, datos)
   modalEdicionVisible.value = false
   joyaEnEdicion.value = null
 }

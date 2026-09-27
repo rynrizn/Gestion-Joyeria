@@ -150,14 +150,24 @@ export const useProductosStore = defineStore('productos', () => {
     return [...CATEGORIAS_BASE]
   }
 
+  const esDatoDePrueba = (lista) => {
+    if (!Array.isArray(lista) || lista.length === 0) return false
+    return lista.some((p) => p.nombre === 'Aros Mini Serpiente Regulable' || p.nombre === 'Earcuff Luna Moonstone')
+  }
+
   const cargarProductosInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_PRODUCTOS)
       if (guardado) {
-        return JSON.parse(guardado)
+        const arr = JSON.parse(guardado)
+        if (isSupabaseConfigured && esDatoDePrueba(arr)) {
+          localStorage.removeItem(CLAVE_PRODUCTOS)
+          return []
+        }
+        return arr
       }
     } catch {}
-    return PRODUCTOS_INICIALES
+    return isSupabaseConfigured ? [] : PRODUCTOS_INICIALES
   }
 
   const categorias = ref(cargarCategoriasInicial())
@@ -196,11 +206,12 @@ export const useProductosStore = defineStore('productos', () => {
         const { data: dataTabla, error: errTabla } = await supabase
           .from('producto')
           .select('*')
-        if (errTabla) throw errTabla
-        listaRecibida = dataTabla
+        if (!errTabla && dataTabla) {
+          listaRecibida = dataTabla
+        }
       }
 
-      if (listaRecibida && listaRecibida.length > 0) {
+      if (listaRecibida !== null && listaRecibida !== undefined) {
         productos.value = listaRecibida.map((p) => ({
           id: p.id_producto || p.id,
           nombre: p.nombre,
@@ -276,7 +287,7 @@ export const useProductosStore = defineStore('productos', () => {
   }
 
   // Actualizar datos de un producto (sincronizado)
-  const actualizarProducto = (id, datos) => {
+  const actualizarProducto = async (id, datos) => {
     const p = productos.value.find((it) => it.id === Number(id))
     if (p) {
       if (datos.nombre !== undefined) p.nombre = datos.nombre
@@ -299,24 +310,26 @@ export const useProductosStore = defineStore('productos', () => {
 
       // Sincronización en segundo plano con Supabase si está activo
       if (isSupabaseConfigured) {
-        supabase
-          .from('producto')
-          .update({
-            nombre: p.nombre,
-            categoria: p.categoria,
-            material: p.material,
-            color: p.color,
-            talla: p.talla,
-            precio: p.precio_venta,
-            es_prioritario: p.es_prioritario,
-            activo: p.activo,
-            stock_minimo: p.stock_minimo,
-            imagen: p.imagen,
-            imagen_detalle: p.imagen_detalle,
+        try {
+          await supabase.rpc('actualizar_producto_completo', {
+            p_id_producto: p.id,
+            p_nombre: p.nombre,
+            p_categoria: p.categoria,
+            p_material: p.material,
+            p_color: p.color,
+            p_talla: p.talla,
+            p_precio: p.precio_venta,
+            p_stock_central: p.stockCentral,
+            p_stock_tienda: p.stockTienda,
+            p_stock_minimo: p.stock_minimo,
+            p_es_prioritario: p.es_prioritario,
+            p_activo: p.activo,
+            p_imagen: p.imagen,
+            p_imagen_detalle: p.imagen_detalle,
           })
-          .eq('id_producto', p.id)
-          .then()
-          .catch((e) => console.warn('ℹ️ [Supabase Sync Update]:', e))
+        } catch (e) {
+          console.warn('ℹ️ [Supabase Sync Update]:', e)
+        }
       }
 
       return true
@@ -325,7 +338,7 @@ export const useProductosStore = defineStore('productos', () => {
   }
 
   // Agregar nuevo producto
-  const agregarProducto = (nuevo) => {
+  const agregarProducto = async (nuevo) => {
     const id = productos.value.length ? Math.max(...productos.value.map((it) => it.id)) + 1 : 1
     const catFinal = (nuevo.categoria || 'AROS MINI').toUpperCase()
     
@@ -340,7 +353,7 @@ export const useProductosStore = defineStore('productos', () => {
       color: nuevo.color || 'Plateado',
       talla: nuevo.talla || 'Estándar',
       precio_venta: Number(nuevo.precio || nuevo.precio_venta || 0),
-      stock: Number(nuevo.stockInicial || nuevo.stock || 0),
+      stock: Number(nuevo.stockInicial !== undefined ? nuevo.stockInicial : (nuevo.stock || 0)),
       stockCentral: Number(nuevo.stockCentral !== undefined ? nuevo.stockCentral : (nuevo.stockInicial || 0)),
       stockTienda: Number(nuevo.stockTienda || 0),
       stock_minimo: Number(nuevo.stock_minimo !== undefined ? nuevo.stock_minimo : 1),
@@ -354,23 +367,31 @@ export const useProductosStore = defineStore('productos', () => {
 
     // Inserción en Supabase en segundo plano si está activo
     if (isSupabaseConfigured) {
-      supabase
-        .from('producto')
-        .insert({
-          nombre: p.nombre,
-          categoria: p.categoria,
-          material: p.material,
-          color: p.color,
-          talla: p.talla,
-          precio: p.precio_venta,
-          es_prioritario: p.es_prioritario,
-          activo: p.activo,
-          stock_minimo: p.stock_minimo,
-          imagen: p.imagen,
-          imagen_detalle: p.imagen_detalle,
+      try {
+        const { data: idGenerado, error: errRpc } = await supabase.rpc('crear_producto_completo', {
+          p_nombre: p.nombre,
+          p_categoria: p.categoria,
+          p_material: p.material,
+          p_color: p.color,
+          p_talla: p.talla,
+          p_precio: p.precio_venta,
+          p_stock_central: p.stockCentral,
+          p_stock_tienda: p.stockTienda,
+          p_stock_minimo: p.stock_minimo,
+          p_es_prioritario: p.es_prioritario,
+          p_activo: p.activo,
+          p_imagen: p.imagen,
+          p_imagen_detalle: p.imagen_detalle,
         })
-        .then()
-        .catch((e) => console.warn('ℹ️ [Supabase Sync Insert]:', e))
+        if (errRpc) {
+          console.warn('ℹ️ [Supabase RPC crear_producto_completo]:', errRpc.message)
+        } else if (idGenerado) {
+          p.id = idGenerado
+          guardarProductosStorage()
+        }
+      } catch (e) {
+        console.warn('ℹ️ [Supabase Sync Insert]:', e)
+      }
     }
 
     return p

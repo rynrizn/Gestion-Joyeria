@@ -85,13 +85,24 @@ const VENTAS_INICIALES = [
 ]
 
 export const useVentasStore = defineStore('ventas', () => {
+  const esDatoDePrueba = (lista) => {
+    if (!Array.isArray(lista) || lista.length === 0) return false
+    return lista.some((v) => v.cliente === 'Camila Morales' || v.cliente === 'Valeria Castro')
+  }
+
   const cargarInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_VENTAS)
-      return guardado ? JSON.parse(guardado) : VENTAS_INICIALES
-    } catch {
-      return VENTAS_INICIALES
-    }
+      if (guardado) {
+        const arr = JSON.parse(guardado)
+        if (isSupabaseConfigured && esDatoDePrueba(arr)) {
+          localStorage.removeItem(CLAVE_VENTAS)
+          return []
+        }
+        return arr
+      }
+    } catch {}
+    return isSupabaseConfigured ? [] : VENTAS_INICIALES
   }
 
   const turnoActual = ref('Turno Tarde')
@@ -114,7 +125,7 @@ export const useVentasStore = defineStore('ventas', () => {
         .select('*')
         .order('fecha_hora', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data !== null && data !== undefined) {
         ventas.value = data.map((v) => ({
           id: v.id_venta || v.id,
           fechaHora: v.fecha_hora ? v.fecha_hora.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -237,7 +248,7 @@ export const useVentasStore = defineStore('ventas', () => {
 
     // Sincronización en segundo plano con Supabase si está activo
     if (isSupabaseConfigured) {
-      supabase.rpc('crear_venta', {
+      supabase.rpc('crear_venta_completa', {
         p_cliente: cliente,
         p_metodo_pago: metodoPago,
         p_monto_total: totalNeto,
@@ -245,24 +256,14 @@ export const useVentasStore = defineStore('ventas', () => {
         p_monto_qr: qrReal,
         p_descuento: Number(descuento || 0),
         p_items: items,
-        p_vendedora: vendedora,
-        p_turno: turno || turnoActual.value,
         p_observacion: observacion,
-      }).then().catch(() => {
-        // Inserción directa en tabla venta si no existe RPC
-        supabase.from('venta').insert({
-          fecha_hora: new Date().toISOString(),
-          monto_total: totalNeto,
-          metodo_pago: metodoPago,
-          monto_efectivo: efectivoReal,
-          monto_qr: qrReal,
-          descuento: Number(descuento || 0),
-          cliente,
-          vendedora,
-          turno: turno || turnoActual.value,
-          observacion,
-        }).then().catch((e) => console.warn('ℹ️ [Supabase Sync Venta]:', e))
-      })
+        p_id_usuario: idVendedora || 1,
+      }).then(({ data: idVenta }) => {
+        if (idVenta) {
+          nuevaVenta.id = idVenta
+          guardarEnStorage()
+        }
+      }).catch((e) => console.warn('ℹ️ [Supabase Sync Venta]:', e))
     }
 
     return nuevaVenta

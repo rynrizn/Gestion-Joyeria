@@ -62,18 +62,27 @@ export const calcularTipoCliente = (cantidadCompras) => {
 }
 
 export const useClientesStore = defineStore('clientes', () => {
+  const esDatoDePrueba = (lista) => {
+    if (!Array.isArray(lista) || lista.length === 0) return false
+    return lista.some((c) => c.nombre === 'María López Vaca' || c.nombre === 'Ana García Saucedo')
+  }
+
   const cargarInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_CLIENTES)
-      if (!guardado) return CLIENTES_INICIALES
-      const parsed = JSON.parse(guardado)
-      return parsed.map((c) => ({
-        ...c,
-        tipo: calcularTipoCliente(c.cantidadCompras),
-      }))
-    } catch {
-      return CLIENTES_INICIALES
-    }
+      if (guardado) {
+        const parsed = JSON.parse(guardado)
+        if (isSupabaseConfigured && esDatoDePrueba(parsed)) {
+          localStorage.removeItem(CLAVE_CLIENTES)
+          return []
+        }
+        return parsed.map((c) => ({
+          ...c,
+          tipo: calcularTipoCliente(c.cantidadCompras),
+        }))
+      }
+    } catch {}
+    return isSupabaseConfigured ? [] : CLIENTES_INICIALES
   }
 
   const clientes = ref(cargarInicial())
@@ -100,11 +109,12 @@ export const useClientesStore = defineStore('clientes', () => {
         const { data: dataCli, error: errCli } = await supabase
           .from('cliente')
           .select('*')
-        if (errCli) throw errCli
-        lista = dataCli
+        if (!errCli && dataCli) {
+          lista = dataCli
+        }
       }
 
-      if (lista && lista.length > 0) {
+      if (lista !== null && lista !== undefined) {
         clientes.value = lista.map((c) => {
           const compras = Number(c.cantidad_compras ?? c.cantidadCompras ?? 0)
           const tel = c.telefono || c.contacto_telefono || ''
@@ -165,11 +175,19 @@ export const useClientesStore = defineStore('clientes', () => {
         .from('cliente')
         .insert({
           nombre: nuevoCliente.nombre,
+          contacto_telefono: nuevoCliente.telefono,
           telefono: nuevoCliente.telefono,
           ci: nuevoCliente.ci,
+          tipo_cliente: nuevoCliente.cantidadCompras > 1 ? 'HABITUAL' : 'NUEVA',
           cantidad_compras: nuevoCliente.cantidadCompras,
         })
-        .then()
+        .select()
+        .then(({ data }) => {
+          if (data && data[0]?.id_cliente) {
+            nuevoCliente.id = data[0].id_cliente
+            guardarEnStorage()
+          }
+        })
         .catch((e) => console.warn('ℹ️ [Supabase Sync Cliente]:', e))
     }
 
@@ -198,8 +216,10 @@ export const useClientesStore = defineStore('clientes', () => {
           .from('cliente')
           .update({
             nombre: c.nombre,
+            contacto_telefono: c.telefono,
             telefono: c.telefono,
             ci: c.ci,
+            tipo_cliente: c.cantidadCompras > 1 ? 'HABITUAL' : 'NUEVA',
             cantidad_compras: c.cantidadCompras,
           })
           .eq('id_cliente', c.id)
