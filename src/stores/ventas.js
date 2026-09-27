@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { supabase, isSupabaseConfigured } from '../supabase/client'
 
 const CLAVE_VENTAS = 'moonstone_ventas'
 
@@ -7,9 +8,9 @@ const VENTAS_INICIALES = [
   {
     id: 101,
     fechaHora: '2026-09-26 14:45',
-    producto: 'Anillo Serpiente Regulable (x2)',
+    producto: 'Aros Mini Serpiente Regulable (x2)',
     items: [
-      { id: 1, nombre: 'Anillo Serpiente Regulable', cantidad: 2, precio: 45, subtotal: 90 },
+      { id: 1, nombre: 'Aros Mini Serpiente Regulable', cantidad: 2, precio: 45, origenStock: 'tienda' },
     ],
     cantidad: 2,
     montoTotal: 90,
@@ -26,9 +27,9 @@ const VENTAS_INICIALES = [
   {
     id: 102,
     fechaHora: '2026-09-26 13:10',
-    producto: 'Collar Luna Moonstone (x1)',
+    producto: 'Earcuff Luna Moonstone (x1)',
     items: [
-      { id: 2, nombre: 'Collar Luna Moonstone', cantidad: 1, precio: 85, subtotal: 85 },
+      { id: 2, nombre: 'Earcuff Luna Moonstone', cantidad: 1, precio: 85, origenStock: 'central' },
     ],
     cantidad: 1,
     montoTotal: 85,
@@ -45,10 +46,10 @@ const VENTAS_INICIALES = [
   {
     id: 103,
     fechaHora: '2026-09-26 11:20',
-    producto: 'Brazalete Eslabón Trenza (x1), Aritos Argolla (x1)',
+    producto: 'Brazalete Eslabón Trenza (x1), Aros Mini Doble Brillo (x1)',
     items: [
-      { id: 5, nombre: 'Brazalete Eslabón Trenza', cantidad: 1, precio: 60, subtotal: 60 },
-      { id: 3, nombre: 'Aritos Argolla Doble Brillo', cantidad: 1, precio: 35, subtotal: 35 },
+      { id: 5, nombre: 'Brazalete Eslabón Trenza', cantidad: 1, precio: 60, origenStock: 'tienda' },
+      { id: 3, nombre: 'Aros Mini Doble Brillo', cantidad: 1, precio: 35, origenStock: 'ambos' },
     ],
     cantidad: 2,
     montoTotal: 95,
@@ -65,9 +66,9 @@ const VENTAS_INICIALES = [
   {
     id: 104,
     fechaHora: '2026-09-26 10:05',
-    producto: 'Aritos Argolla Doble Brillo (x2)',
+    producto: 'Aros Mini Doble Brillo (x2)',
     items: [
-      { id: 3, nombre: 'Aritos Argolla Doble Brillo', cantidad: 2, precio: 35, subtotal: 70 },
+      { id: 3, nombre: 'Aros Mini Doble Brillo', cantidad: 2, precio: 35, origenStock: 'tienda' },
     ],
     cantidad: 2,
     montoTotal: 70,
@@ -102,6 +103,42 @@ export const useVentasStore = defineStore('ventas', () => {
     } catch (e) {
       console.error('Error al guardar ventas:', e)
     }
+  }
+
+  // Carga asíncrona desde Supabase (vista vw_reporte_ventas o tabla venta)
+  const cargarVentasSupabase = async () => {
+    if (!isSupabaseConfigured) return false
+    try {
+      const { data, error } = await supabase
+        .from('vw_reporte_ventas')
+        .select('*')
+        .order('fecha_hora', { ascending: false })
+
+      if (!error && data && data.length > 0) {
+        ventas.value = data.map((v) => ({
+          id: v.id_venta || v.id,
+          fechaHora: v.fecha_hora ? v.fecha_hora.slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' '),
+          producto: v.descripcion_items || v.producto || 'Productos Varios',
+          items: Array.isArray(v.items) ? v.items : [],
+          cantidad: Number(v.cantidad_total || v.cantidad || 1),
+          montoTotal: Number(v.total || v.montoTotal || 0),
+          descuento: Number(v.descuento || 0),
+          metodoPago: v.metodo_pago || v.metodoPago || 'EFECTIVO',
+          montoEfectivo: Number(v.monto_efectivo ?? v.montoEfectivo ?? 0),
+          montoQR: Number(v.monto_qr ?? v.montoQR ?? 0),
+          cliente: v.cliente || 'Cliente Casual',
+          vendedora: v.vendedora || 'Personal',
+          idVendedora: v.id_usuario || v.idVendedora || null,
+          turno: v.turno || 'Turno Tarde',
+          observacion: v.observacion || '',
+        }))
+        guardarEnStorage()
+        return true
+      }
+    } catch (err) {
+      console.warn('ℹ️ [Supabase] Usando almacenamiento local para ventas:', err.message)
+    }
+    return false
   }
 
   // Totales agregados (considerando pagos híbridos en sus respectivas cuentas)
@@ -197,6 +234,37 @@ export const useVentasStore = defineStore('ventas', () => {
 
     ventas.value.unshift(nuevaVenta)
     guardarEnStorage()
+
+    // Sincronización en segundo plano con Supabase si está activo
+    if (isSupabaseConfigured) {
+      supabase.rpc('crear_venta', {
+        p_cliente: cliente,
+        p_metodo_pago: metodoPago,
+        p_monto_total: totalNeto,
+        p_monto_efectivo: efectivoReal,
+        p_monto_qr: qrReal,
+        p_descuento: Number(descuento || 0),
+        p_items: items,
+        p_vendedora: vendedora,
+        p_turno: turno || turnoActual.value,
+        p_observacion: observacion,
+      }).then().catch(() => {
+        // Inserción directa en tabla venta si no existe RPC
+        supabase.from('venta').insert({
+          fecha_hora: new Date().toISOString(),
+          monto_total: totalNeto,
+          metodo_pago: metodoPago,
+          monto_efectivo: efectivoReal,
+          monto_qr: qrReal,
+          descuento: Number(descuento || 0),
+          cliente,
+          vendedora,
+          turno: turno || turnoActual.value,
+          observacion,
+        }).then().catch((e) => console.warn('ℹ️ [Supabase Sync Venta]:', e))
+      })
+    }
+
     return nuevaVenta
   }
 
@@ -209,6 +277,7 @@ export const useVentasStore = defineStore('ventas', () => {
     ventasManana,
     ventasTarde,
     ventasPorVendedora,
+    cargarVentasSupabase,
     registrarVenta,
   }
 })

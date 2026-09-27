@@ -36,10 +36,17 @@ const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '⚠️ [Supabase] Faltan las variables de entorno VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en el archivo .env.\n' +
-    'La aplicación operará en modo demostración local reactivo con Pinia.'
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  !supabaseUrl.includes('placeholder') &&
+  !supabaseAnonKey.includes('placeholder')
+)
+
+if (!isSupabaseConfigured) {
+  console.info(
+    'ℹ️ [Supabase] Variables de entorno VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY no configuradas o en modo plantilla.\n' +
+    'La aplicación operará en modo local reactivo con Pinia y persistencia en localStorage.'
   )
 }
 
