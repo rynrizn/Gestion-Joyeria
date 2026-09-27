@@ -204,8 +204,7 @@ const guardarNuevaClientaRapida = () => {
     nombre: nuevoClienteNombre.value,
     telefono: nuevoClienteTelefono.value,
     ci: nuevoClienteCI.value,
-    tipo: 'NUEVA',
-    notas: 'Registrada en punto de venta mostrador',
+    cantidadCompras: 1,
   })
 
   idClienteSeleccionado.value = creada.id
