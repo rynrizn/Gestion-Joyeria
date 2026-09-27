@@ -1,6 +1,10 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
 import IconoLucide from './IconoLucide.vue'
+
+const authStore = useAuthStore()
 
 const enlacesMovil = [
   { nombre: 'Inicio', ruta: '/admin/dashboard', icono: 'LayoutDashboard' },
@@ -9,13 +13,22 @@ const enlacesMovil = [
   { nombre: 'Clientes', ruta: '/admin/clientes', icono: 'Users' },
   { nombre: 'Reportes', ruta: '/admin/reportes', icono: 'BarChart3' },
 ]
+
+const enlacesVisibles = computed(() => {
+  return enlacesMovil.filter((item) => {
+    if (item.ruta === '/admin/reportes' && !authStore.esAdmin) {
+      return false
+    }
+    return true
+  })
+})
 </script>
 
 <template>
   <nav class="barra-inferior">
     <div class="contenedor-botones">
       <RouterLink
-        v-for="item in enlacesMovil"
+        v-for="item in enlacesVisibles"
         :key="item.ruta"
         :to="item.ruta"
         class="boton-item"

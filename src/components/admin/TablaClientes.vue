@@ -6,9 +6,13 @@ defineProps({
     type: Array,
     required: true,
   },
+  esAdmin: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
+defineEmits(['crear-reserva', 'contactar', 'ver-historial', 'editar'])
 </script>
 
 <template>
@@ -18,8 +22,8 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
         <thead>
           <tr>
             <th>Nombre de la Clienta</th>
-            <th>WhatsApp / Teléfono</th>
-            <th>Nivel de Confianza</th>
+            <th>WhatsApp / Contacto</th>
+            <th>Tipo de Cliente</th>
             <th>Compras Realizadas</th>
             <th>Última Visita</th>
             <th class="col-acciones">Acción</th>
@@ -27,7 +31,7 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
         </thead>
         <tbody>
           <tr v-for="c in clientes" :key="c.id">
-            <!-- Nombre y notas -->
+            <!-- 1. Nombre y notas -->
             <td>
               <div class="celda-nombre">
                 <span class="nombre-principal">{{ c.nombre }}</span>
@@ -35,52 +39,46 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
               </div>
             </td>
 
-            <!-- Teléfono WhatsApp -->
+            <!-- 2. Teléfono WhatsApp -->
             <td>
               <button
-                v-if="c.telefono"
+                v-if="c.telefono || c.contacto_telefono"
                 type="button"
                 class="boton-whatsapp-enlace"
                 title="Escribir por WhatsApp"
                 @click="$emit('contactar', c)"
               >
                 <IconoLucide nombre="MessageCircle" :tamano="14" />
-                <span>{{ c.telefono }}</span>
+                <span>{{ c.telefono || c.contacto_telefono }}</span>
               </button>
               <span v-else class="sin-dato">-</span>
             </td>
 
-            <!-- Nivel de Confianza -->
+            <!-- 3. Tipo de Cliente (Limpio sin paréntesis) -->
             <td>
               <span
                 class="badge-confianza"
-                :class="c.tipo === 'HABITUAL' ? 'habitual' : 'nueva'"
+                :class="c.tipo?.toLowerCase().includes('habitual') ? 'habitual' : 'nueva'"
               >
                 <IconoLucide
-                  :nombre="c.tipo === 'HABITUAL' ? 'ShieldCheck' : 'UserPlus'"
+                  :nombre="c.tipo?.toLowerCase().includes('habitual') ? 'ShieldCheck' : 'UserPlus'"
                   :tamano="13"
                 />
-                <span>
-                  {{
-                    c.tipo === 'HABITUAL'
-                      ? 'Habitual (Permite reserva sin seña)'
-                      : 'Nueva (Requiere pago total)'
-                  }}
-                </span>
+                <span>{{ c.tipo?.toLowerCase().includes('habitual') ? 'Habitual' : 'Nuevo' }}</span>
               </span>
             </td>
 
-            <!-- Cantidad de Compras -->
+            <!-- 4. Cantidad de Compras -->
             <td>
               <span class="cifra-compras">
                 <strong>{{ c.cantidadCompras }}</strong> compras
               </span>
             </td>
 
-            <!-- Última Visita -->
+            <!-- 5. Última Visita -->
             <td class="fecha-visita">{{ c.ultimaVisita }}</td>
 
-            <!-- Acciones: Historial y Crear Reserva Temporal -->
+            <!-- 6. Acciones: Historial, Apartar y Editar (Editar solo Dueña) -->
             <td class="col-acciones">
               <div class="grupo-acciones-cliente">
                 <button
@@ -92,6 +90,7 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
                   <IconoLucide nombre="History" :tamano="14" />
                   <span>Historial</span>
                 </button>
+
                 <button
                   type="button"
                   class="boton-crear-reserva"
@@ -100,6 +99,17 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
                 >
                   <IconoLucide nombre="CalendarPlus" :tamano="14" />
                   <span>Apartar</span>
+                </button>
+
+                <!-- Botón Editar (Solo Dueña) -->
+                <button
+                  v-if="esAdmin"
+                  type="button"
+                  class="boton-editar-cliente"
+                  title="Editar información de la clienta (Solo Dueña)"
+                  @click="$emit('editar', c)"
+                >
+                  <IconoLucide nombre="Edit" :tamano="14" />
                 </button>
               </div>
             </td>
@@ -180,7 +190,7 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-whatsapp);
+  color: var(--color-whatsapp, #25d366);
   font-size: 13px;
   font-weight: 500;
   width: fit-content;
@@ -194,7 +204,7 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
   color: var(--color-neutral-600);
 }
 
-/* Badge de Confianza */
+/* Badge de Confianza / Tipo limpio */
 .badge-confianza {
   display: inline-flex;
   align-items: center;
@@ -202,20 +212,20 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
   padding: 4px 10px;
   border-radius: var(--radio-completo);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .badge-confianza.habitual {
-  background-color: var(--color-exito-fondo);
-  color: var(--color-exito);
-  border: 1px solid rgba(22, 163, 74, 0.2);
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid rgba(22, 163, 74, 0.25);
 }
 
 .badge-confianza.nueva {
-  background-color: var(--color-alerta-fondo);
-  color: var(--color-alerta);
-  border: 1px solid rgba(217, 119, 6, 0.2);
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
 .cifra-compras {
@@ -278,6 +288,25 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial'])
 
 .boton-crear-reserva:hover {
   background-color: var(--color-primario-hover);
+}
+
+.boton-editar-cliente {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radio-sm);
+  border: 1px solid var(--color-neutral-200);
+  color: var(--color-neutral-600);
+  background-color: var(--color-blanco);
+  cursor: pointer;
+  transition: all var(--transicion-rapida);
+}
+
+.boton-editar-cliente:hover {
+  background-color: var(--color-neutral-200);
+  color: var(--color-neutral-900);
 }
 
 .fila-vacia {

@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import IconoLucide from './IconoLucide.vue'
@@ -13,6 +14,16 @@ const enlacesNavegacion = [
   { nombre: 'Clientes y Reservas', ruta: '/admin/clientes', icono: 'Users' },
   { nombre: 'Reportes', ruta: '/admin/reportes', icono: 'BarChart3' },
 ]
+
+// Ocultar Reportes para personal de tienda (Solo Dueña)
+const enlacesVisibles = computed(() => {
+  return enlacesNavegacion.filter((item) => {
+    if (item.ruta === '/admin/reportes' && !authStore.esAdmin) {
+      return false
+    }
+    return true
+  })
+})
 
 const cerrarSesion = () => {
   authStore.cerrarSesion()
@@ -33,7 +44,7 @@ const cerrarSesion = () => {
     <!-- Menú de Enlaces -->
     <nav class="navegacion-sidebar">
       <ul class="lista-enlaces">
-        <li v-for="item in enlacesNavegacion" :key="item.ruta">
+        <li v-for="item in enlacesVisibles" :key="item.ruta">
           <RouterLink :to="item.ruta" class="enlace-nav" active-class="enlace-activo">
             <IconoLucide :nombre="item.icono" :tamano="18" />
             <span class="texto-enlace">{{ item.nombre }}</span>

@@ -62,6 +62,7 @@ const routes = [
         path: 'reportes',
         name: 'admin-reportes',
         component: () => import('../views/ReportesView.vue'),
+        meta: { requiereAdmin: true },
       },
     ],
   },
@@ -96,6 +97,20 @@ router.beforeEach((to) => {
   if (to.name === 'login' && estaAutenticado) {
     // Si ya está autenticado e intenta ir a login, se le envía al dashboard
     return { name: 'admin-dashboard' }
+  }
+
+  // Validación de permiso de administrador exclusivo para Reportes
+  const requiereAdmin = to.matched.some((record) => record.meta.requiereAdmin)
+  if (requiereAdmin && estaAutenticado) {
+    try {
+      const user = JSON.parse(sesionGuardada)
+      if (user.rol !== 'ADMINISTRADORA') {
+        // Personal de tienda no autorizado para ver reportes del negocio -> redirigir a dashboard
+        return { name: 'admin-dashboard' }
+      }
+    } catch {
+      return { name: 'login' }
+    }
   }
 
   return true

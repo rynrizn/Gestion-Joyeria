@@ -4,6 +4,7 @@ import { useClientesStore } from '../stores/clientes'
 import { useProductosStore } from '../stores/productos'
 import { useReservasStore } from '../stores/reservas'
 import { useVentasStore } from '../stores/ventas'
+import { useAuthStore } from '../stores/auth'
 import TablaClientes from '../components/admin/TablaClientes.vue'
 import BuscadorProducto from '../components/admin/BuscadorProducto.vue'
 import Buscador from '../components/catalogo/Buscador.vue'
@@ -17,12 +18,22 @@ const clientesStore = useClientesStore()
 const productosStore = useProductosStore()
 const reservasStore = useReservasStore()
 const ventasStore = useVentasStore()
+const authStore = useAuthStore()
 
 // Modales
 const modalNuevoClienteVisible = ref(false)
+const modalEditarClienteVisible = ref(false)
 const modalReservaVisible = ref(false)
 const modalHistorialVisible = ref(false)
 const clientaHistorial = ref(null)
+const clientaEnEdicion = ref(null)
+
+// Formulario de Edición de Clienta (Solo Dueña)
+const editNombre = ref('')
+const editTelefono = ref('')
+const editCI = ref('')
+const editCompras = ref(0)
+const editNotas = ref('')
 
 // Modal de Error / Feedback
 const modalErrorVisible = ref(false)
@@ -101,6 +112,46 @@ const guardarNuevoCliente = () => {
   modalNuevoClienteVisible.value = false
 }
 
+const abrirModalEdicionCliente = (cliente) => {
+  if (!authStore.esAdmin) {
+    modalErrorTitulo.value = 'Permiso Denegado'
+    modalErrorMensaje.value = 'Solo la Administradora (Dueña) tiene autorización para modificar la información de las clientas.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
+    return
+  }
+
+  clientaEnEdicion.value = cliente
+  editNombre.value = cliente.nombre || ''
+  editTelefono.value = cliente.telefono || cliente.contacto_telefono || ''
+  editCI.value = cliente.ci || ''
+  editCompras.value = Number(cliente.cantidadCompras || 0)
+  editNotas.value = cliente.notas || ''
+  modalEditarClienteVisible.value = true
+}
+
+const guardarEdicionCliente = () => {
+  if (!editNombre.value.trim()) {
+    modalErrorTitulo.value = 'Nombre Obligatorio'
+    modalErrorMensaje.value = 'Por favor ingresa el nombre de la clienta.'
+    modalErrorDetalles.value = ''
+    modalErrorVisible.value = true
+    return
+  }
+
+  clientesStore.actualizarCliente(clientaEnEdicion.value.id, {
+    nombre: editNombre.value,
+    telefono: editTelefono.value,
+    contacto_telefono: editTelefono.value,
+    ci: editCI.value,
+    cantidadCompras: Number(editCompras.value),
+    notas: editNotas.value,
+  })
+
+  modalEditarClienteVisible.value = false
+  clientaEnEdicion.value = null
+}
+
 const confirmarReservaTemporal = () => {
   if (!clienteReserva.value || !joyaReserva.value) {
     modalErrorTitulo.value = 'Joya Requerida'
@@ -163,12 +214,14 @@ const contactarWhatsApp = (cliente) => {
       </div>
     </div>
 
-    <!-- Tabla de Clientas con Acción de Ver Historial -->
+    <!-- Tabla de Clientas con Acción de Ver Historial y Edición (Dueña) -->
     <TablaClientes
       :clientes="clientesStore.clientesFiltrados"
+      :es-admin="authStore.esAdmin"
       @crear-reserva="abrirModalReserva"
       @contactar="contactarWhatsApp"
       @ver-historial="abrirModalHistorial"
+      @editar="abrirModalEdicionCliente"
     />
 
     <!-- Modal 1: Registro de Nueva Clienta -->
@@ -387,6 +440,71 @@ const contactarWhatsApp = (cliente) => {
           </BotonPrincipal>
         </div>
       </div>
+    </ModalBase>
+
+    <!-- Modal 5: Edición de Datos de Clienta (Exclusivo Dueña) -->
+    <ModalBase
+      :visible="modalEditarClienteVisible"
+      :titulo="`Editar Clienta: ${clientaEnEdicion?.nombre || ''}`"
+      ancho-maximo="480px"
+      @cerrar="modalEditarClienteVisible = false"
+    >
+      <form v-if="clientaEnEdicion" class="formulario-cliente" @submit.prevent="guardarEdicionCliente">
+        <InputTexto
+          v-model="editNombre"
+          etiqueta="Nombre y Apellidos *"
+          placeholder="Ej. Valeria Castro Pinto"
+          requerido
+        />
+
+        <div class="fila-dos-inputs">
+          <InputTexto
+            v-model="editTelefono"
+            tipo="tel"
+            etiqueta="WhatsApp / Contacto *"
+            placeholder="Ej. 71234567"
+          />
+
+          <InputTexto
+            v-model="editCI"
+            etiqueta="C.I. / NIT (opcional)"
+            placeholder="Ej. 8392102 SC"
+          />
+        </div>
+
+        <div class="campo-grupo">
+          <label class="etiqueta-campo">Compras Realizadas (Ajuste Administradora) *</label>
+          <input
+            v-model.number="editCompras"
+            type="number"
+            min="0"
+            class="input-control"
+            required
+          />
+          <span class="ayuda-subtexto">
+            Tipo calculado: <strong>{{ editCompras > 1 ? 'Habitual (Mayor a 1 compra)' : 'Nuevo (0 a 1 compra)' }}</strong>
+          </span>
+        </div>
+
+        <InputTexto
+          v-model="editNotas"
+          etiqueta="Notas sobre gustos o preferencias"
+          placeholder="Ej. Le gustan los aros mini y piercings plateados"
+        />
+
+        <div class="acciones-modal">
+          <button
+            type="button"
+            class="boton-cancelar"
+            @click="modalEditarClienteVisible = false"
+          >
+            Cancelar
+          </button>
+          <BotonPrincipal tipo="submit">
+            Guardar Cambios
+          </BotonPrincipal>
+        </div>
+      </form>
     </ModalBase>
 
     <!-- Modal 4: Alerta de Errores -->
