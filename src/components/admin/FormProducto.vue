@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useProductosStore } from '../../stores/productos'
 import InputTexto from '../common/InputTexto.vue'
 import BotonPrincipal from '../common/BotonPrincipal.vue'
 import IconoLucide from '../common/IconoLucide.vue'
@@ -11,65 +12,101 @@ const props = defineProps({
   },
   modo: {
     type: String,
-    default: 'crear',
+    default: 'crear', // 'crear' | 'editar'
   },
 })
 
 const emit = defineEmits(['guardar', 'cancelar'])
 
+const productosStore = useProductosStore()
+
+// Campos del formulario
 const nombre = ref('')
-const categoria = ref('Anillos')
+const categoria = ref('AROS MINI')
 const material = ref('Acero 316L')
+const color = ref('Plateado')
+const talla = ref('')
 const precio = ref('')
 const stockInicial = ref(5)
+const stockMinimo = ref(1)
+const esPrioritario = ref(false)
+const activo = ref(true)
 
-// Manejo de 2 fotos (Principal y Detalle)
+// Nueva categoría rápida
+const mostrandoNuevaCat = ref(false)
+const nombreNuevaCat = ref('')
+
+// Fotos (Principal y Detalle)
 const foto1Preview = ref('')
 const foto2Preview = ref('')
 
-const categoriasDisponibles = [
-  'Anillos',
-  'Cadenas/Collares',
-  'Aritos',
-  'Piercings',
-  'Brazaletes',
-  'Chokers',
-  'Cinturones',
-  'Gafas',
-]
+// Listas dinámicas derivadas de productos existentes + bases
+const categoriasDisponibles = computed(() => {
+  return productosStore.categorias.filter((c) => c !== 'TODOS')
+})
 
-const materialesDisponibles = [
-  'Acero 316L',
-  'Artesanal',
-  'Oro Laminado',
-  'Plata 925',
-  'Titanio Grado Implante',
-]
+const materialesSugeridos = computed(() => {
+  const existentes = productosStore.productos.map((p) => p.material).filter(Boolean)
+  const bases = ['Acero 316L', 'Artesanal', 'Oro Laminado', 'Plata 925', 'Titanio Grado Implante']
+  return Array.from(new Set([...bases, ...existentes]))
+})
 
-// Sincronizar datos si estamos en modo edición
+const coloresSugeridos = computed(() => {
+  const existentes = productosStore.productos.map((p) => p.color).filter(Boolean)
+  const bases = ['Plateado', 'Dorado', 'Tornasol', 'Negro', 'Oro Rosa', 'Carey']
+  return Array.from(new Set([...bases, ...existentes]))
+})
+
+const tallasSugeridas = computed(() => {
+  const existentes = productosStore.productos.map((p) => p.talla).filter(Boolean)
+  const bases = ['Ajustable', 'Estándar', '12 mm', '14 mm', '16 cm', '18 cm', '45 cm', '50 cm']
+  return Array.from(new Set([...bases, ...existentes]))
+})
+
+// Sincronizar datos si estamos en modo edición o creación
 watch(
   () => props.productoInicial,
   (p) => {
     if (p) {
       nombre.value = p.nombre || ''
-      categoria.value = p.categoria || 'Anillos'
+      categoria.value = (p.categoria || 'AROS MINI').toUpperCase()
       material.value = p.material || 'Acero 316L'
+      color.value = p.color || 'Plateado'
+      talla.value = p.talla || ''
       precio.value = p.precio !== undefined ? p.precio : (p.precio_venta || '')
       stockInicial.value = p.stockCentral !== undefined ? p.stockCentral : (p.stock || 5)
+      stockMinimo.value = p.stock_minimo !== undefined ? p.stock_minimo : (p.stockMinimo !== undefined ? p.stockMinimo : 1)
+      esPrioritario.value = Boolean(p.es_prioritario)
+      activo.value = p.activo !== undefined ? Boolean(p.activo) : true
       foto1Preview.value = p.imagen || ''
       foto2Preview.value = p.imagen_detalle || ''
     } else {
       nombre.value = ''
-      categoria.value = 'Anillos'
+      categoria.value = categoriasDisponibles.value[0] || 'AROS MINI'
       material.value = 'Acero 316L'
+      color.value = 'Plateado'
+      talla.value = ''
       precio.value = ''
       stockInicial.value = 5
+      stockMinimo.value = 1
+      esPrioritario.value = false
+      activo.value = true
       foto1Preview.value = ''
       foto2Preview.value = ''
     }
   },
   { immediate: true }
 )
+
+const crearNuevaCategoria = () => {
+  if (!nombreNuevaCat.value.trim()) return
+  const catCreada = productosStore.agregarCategoria(nombreNuevaCat.value)
+  if (catCreada) {
+    categoria.value = catCreada
+    nombreNuevaCat.value = ''
+    mostrandoNuevaCat.value = false
+  }
+}
 
 const manejarSubidaFoto = (evento, numeroFoto) => {
   const archivo = evento.target.files[0]
@@ -80,57 +117,27 @@ const manejarSubidaFoto = (evento, numeroFoto) => {
   }
 }
 
-/**
- * =============================================================================
- * GUÍA DE SUBIDA DE IMÁGENES A SUPABASE STORAGE BUCKET: 'joyas-fotos'
- * =============================================================================
- *
- * async function subirFotoASupabase(archivo, idProducto, esPortada = true) {
- *   // 1. Crear nombre de archivo único
- *   const extension = archivo.name.split('.').pop()
- *   const nombreArchivo = `${idProducto}_${esPortada ? 'portada' : 'detalle'}_${Date.now()}.${extension}`
- *   const rutaStorage = `productos/${nombreArchivo}`
- *
- *   // 2. Subir binario al Storage bucket público
- *   const { error: errorSubida } = await supabase.storage
- *     .from('joyas-fotos')
- *     .upload(rutaStorage, archivo, {
- *       cacheControl: '3600',
- *       upsert: true,
- *     })
- *   if (errorSubida) throw errorSubida
- *
- *   // 3. Obtener URL pública
- *   const { data: { publicUrl } } = supabase.storage
- *     .from('joyas-fotos')
- *     .getPublicUrl(rutaStorage)
- *
- *   // 4. Registrar en la tabla PostgreSQL 'imagen_producto'
- *   await supabase.from('imagen_producto').insert({
- *     id_producto: idProducto,
- *     url_imagen: publicUrl,
- *     es_portada: esPortada,
- *   })
- *
- *   return publicUrl
- * }
- * =============================================================================
- */
-
 const enviarFormulario = () => {
   if (!nombre.value.trim() || !precio.value) {
-    alert('Por favor, completa al menos el nombre y el precio de la joya.')
+    alert('Por favor, completa al menos el nombre y el precio del producto.')
     return
   }
 
   emit('guardar', {
     id: props.productoInicial?.id,
     nombre: nombre.value.trim(),
-    categoria: categoria.value,
-    material: material.value,
+    categoria: categoria.value.toUpperCase(),
+    material: material.value.trim() || 'Acero 316L',
+    color: color.value.trim() || 'Plateado',
+    talla: talla.value.trim() || 'Estándar',
     precio: Number(precio.value),
-    stockInicial: Number(stockInicial.value),
-    stockCentral: Number(stockInicial.value),
+    precio_venta: Number(precio.value),
+    stockInicial: Number(stockInicial.value || 0),
+    stockCentral: Number(stockInicial.value || 0),
+    stock_minimo: Number(stockMinimo.value || 1),
+    stockMinimo: Number(stockMinimo.value || 1),
+    es_prioritario: Boolean(esPrioritario.value),
+    activo: Boolean(activo.value),
     imagen: foto1Preview.value || 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=500&auto=format&fit=crop&q=80',
     imagen_detalle: foto2Preview.value || '',
   })
@@ -139,37 +146,102 @@ const enviarFormulario = () => {
 
 <template>
   <form class="formulario-producto" @submit.prevent="enviarFormulario">
-    <!-- Nombre -->
+    <!-- 1. Nombre del Producto -->
     <InputTexto
       v-model="nombre"
-      etiqueta="Nombre de la pieza *"
-      placeholder="Ej. Anillo Serpiente Regulable"
+      etiqueta="Nombre del Producto *"
+      placeholder="Ej. Aros Mini Serpiente Regulable"
       requerido
     />
 
-    <!-- Categoría y Material en 2 Columnas -->
-    <div class="fila-dos-columnas">
-      <div class="grupo-select">
+    <!-- 2. Categoría y Nueva Categoría Rápida -->
+    <div class="grupo-campo">
+      <div class="cabecera-campo-cat">
         <label class="etiqueta-select">Categoría *</label>
-        <select v-model="categoria" class="control-select">
-          <option v-for="cat in categoriasDisponibles" :key="cat" :value="cat">
-            {{ cat }}
-          </option>
-        </select>
+        <button
+          type="button"
+          class="boton-link-cat"
+          @click="mostrandoNuevaCat = !mostrandoNuevaCat"
+        >
+          <IconoLucide :nombre="mostrandoNuevaCat ? 'X' : 'Plus'" :tamano="14" />
+          <span>{{ mostrandoNuevaCat ? 'Cancelar' : '+ Nueva Categoría' }}</span>
+        </button>
       </div>
 
-      <div class="grupo-select">
+      <!-- Creador rápido de categoría -->
+      <div v-if="mostrandoNuevaCat" class="caja-nueva-cat">
+        <input
+          v-model="nombreNuevaCat"
+          type="text"
+          placeholder="NOMBRE DE LA CATEGORÍA..."
+          class="input-nueva-cat"
+          @keyup.enter.prevent="crearNuevaCategoria"
+        />
+        <button
+          type="button"
+          class="boton-confirmar-cat"
+          @click="crearNuevaCategoria"
+        >
+          Crear
+        </button>
+      </div>
+
+      <select v-model="categoria" class="control-select">
+        <option v-for="cat in categoriasDisponibles" :key="cat" :value="cat">
+          {{ cat }}
+        </option>
+      </select>
+    </div>
+
+    <!-- 3. Material y Color con Datalists interactivos -->
+    <div class="fila-dos-columnas">
+      <div class="grupo-campo">
         <label class="etiqueta-select">Material *</label>
-        <select v-model="material" class="control-select">
-          <option v-for="mat in materialesDisponibles" :key="mat" :value="mat">
-            {{ mat }}
-          </option>
-        </select>
+        <input
+          v-model="material"
+          list="lista-materiales"
+          type="text"
+          class="input-control"
+          placeholder="Ej. Acero 316L"
+          required
+        />
+        <datalist id="lista-materiales">
+          <option v-for="mat in materialesSugeridos" :key="mat" :value="mat" />
+        </datalist>
+      </div>
+
+      <div class="grupo-campo">
+        <label class="etiqueta-select">Color *</label>
+        <input
+          v-model="color"
+          list="lista-colores"
+          type="text"
+          class="input-control"
+          placeholder="Ej. Plateado"
+          required
+        />
+        <datalist id="lista-colores">
+          <option v-for="col in coloresSugeridos" :key="col" :value="col" />
+        </datalist>
       </div>
     </div>
 
-    <!-- Precio y Stock Inicial en 2 Columnas -->
+    <!-- 4. Medida / Talla y Precio de Venta -->
     <div class="fila-dos-columnas">
+      <div class="grupo-campo">
+        <label class="etiqueta-select">Medida / Talla</label>
+        <input
+          v-model="talla"
+          list="lista-tallas"
+          type="text"
+          class="input-control"
+          placeholder="Ej. Ajustable, 18 cm, 12 mm"
+        />
+        <datalist id="lista-tallas">
+          <option v-for="tal in tallasSugeridas" :key="tal" :value="tal" />
+        </datalist>
+      </div>
+
       <InputTexto
         v-model="precio"
         tipo="number"
@@ -177,19 +249,58 @@ const enviarFormulario = () => {
         placeholder="Ej. 45"
         requerido
       />
+    </div>
 
+    <!-- 5. Stock Central y Stock Mínimo -->
+    <div class="fila-dos-columnas">
       <InputTexto
         v-model="stockInicial"
         tipo="number"
         :etiqueta="modo === 'editar' ? 'Stock en Central (Dueña)' : 'Stock inicial (Central) *'"
-        placeholder="Ej. 10"
+        placeholder="Ej. 5"
         requerido
       />
+
+      <div class="grupo-campo">
+        <label class="etiqueta-select">Stock Mínimo (Alerta) *</label>
+        <input
+          v-model.number="stockMinimo"
+          type="number"
+          min="1"
+          class="input-control"
+          placeholder="Predeterminado: 1"
+          required
+        />
+        <span class="ayuda-subtexto">Alerta si las existencias bajan de este número</span>
+      </div>
     </div>
 
-    <!-- Carga de 2 Fotos WebP (Foto 1 y Foto 2) -->
+    <!-- 6. Interruptores: Estado Activo y Prioridad -->
+    <div class="caja-switches">
+      <!-- Switch Activo -->
+      <label class="control-switch">
+        <div class="texto-switch">
+          <span class="titulo-switch">Producto Activo en Catálogo</span>
+          <span class="desc-switch">Si está inactivo, queda oculto para los clientes en la web</span>
+        </div>
+        <input v-model="activo" type="checkbox" class="sr-only" />
+        <span class="deslizador-switch" :class="{ 'activo-on': activo }"></span>
+      </label>
+
+      <!-- Switch Prioridad -->
+      <label class="control-switch">
+        <div class="texto-switch">
+          <span class="titulo-switch">Producto Prioritario</span>
+          <span class="desc-switch">Marca si tiene prioridad alta de reposición y venta</span>
+        </div>
+        <input v-model="esPrioritario" type="checkbox" class="sr-only" />
+        <span class="deslizador-switch prioridad" :class="{ 'prioridad-on': esPrioritario }"></span>
+      </label>
+    </div>
+
+    <!-- 7. Fotografías (Foto 1 Portada y Foto 2 Detalle) -->
     <div class="seccion-carga-fotos">
-      <label class="etiqueta-select">Fotografías de la joya (2 fotos)</label>
+      <label class="etiqueta-select">Fotografías del producto (2 fotos)</label>
       <div class="cuadricula-cajas-foto">
         <!-- Foto 1 (Principal) -->
         <label class="caja-subida" :class="{ 'con-foto': foto1Preview }">
@@ -225,7 +336,7 @@ const enviarFormulario = () => {
       </div>
     </div>
 
-    <!-- Botones de Acción -->
+    <!-- 8. Botones de Acción -->
     <div class="acciones-formulario">
       <button
         type="button"
@@ -236,7 +347,7 @@ const enviarFormulario = () => {
       </button>
 
       <BotonPrincipal tipo="submit">
-        {{ modo === 'editar' ? 'Guardar Cambios' : 'Guardar Joya en Inventario' }}
+        {{ modo === 'editar' ? 'Guardar Cambios' : 'Guardar Producto en Inventario' }}
       </BotonPrincipal>
     </div>
   </form>
@@ -261,10 +372,59 @@ const enviarFormulario = () => {
   }
 }
 
-.grupo-select {
+.grupo-campo {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.cabecera-campo-cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.boton-link-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primario);
+  cursor: pointer;
+}
+
+.boton-link-cat:hover {
+  text-decoration: underline;
+}
+
+.caja-nueva-cat {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.input-nueva-cat {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-primario);
+  border-radius: var(--radio-md);
+  font-size: 12px;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.boton-confirmar-cat {
+  padding: 8px 14px;
+  background-color: var(--color-primario);
+  color: var(--color-blanco);
+  border: none;
+  border-radius: var(--radio-md);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .etiqueta-select {
@@ -273,7 +433,8 @@ const enviarFormulario = () => {
   color: var(--color-neutral-900);
 }
 
-.control-select {
+.control-select,
+.input-control {
   width: 100%;
   padding: 10px 14px;
   background-color: var(--color-blanco);
@@ -282,14 +443,95 @@ const enviarFormulario = () => {
   color: var(--color-neutral-900);
   font-size: var(--tamano-cuerpo);
   outline: none;
-  cursor: pointer;
   transition: border-color var(--transicion-rapida);
 }
 
-.control-select:focus {
+.control-select:focus,
+.input-control:focus {
   border-color: var(--color-primario);
 }
 
+.ayuda-subtexto {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+/* Caja de Switches */
+.caja-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: var(--color-neutral-50);
+  padding: 14px 16px;
+  border-radius: var(--radio-md);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.control-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.texto-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.titulo-switch {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.desc-switch {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.deslizador-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: var(--color-neutral-300);
+  border-radius: 20px;
+  transition: background-color var(--transicion-rapida);
+  flex-shrink: 0;
+}
+
+.deslizador-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform var(--transicion-rapida);
+}
+
+.deslizador-switch.activo-on {
+  background-color: var(--color-exito, #16a34a);
+}
+
+.deslizador-switch.activo-on::after {
+  transform: translateX(20px);
+}
+
+.deslizador-switch.prioridad.prioridad-on {
+  background-color: #2563eb; /* Azul prioridad activa */
+}
+
+.deslizador-switch.prioridad.prioridad-on::after {
+  transform: translateX(20px);
+}
+
+/* Carga de Fotos */
 .seccion-carga-fotos {
   display: flex;
   flex-direction: column;
