@@ -78,10 +78,10 @@ const agregarAlCarrito = () => {
               type="button"
               class="boton-miniatura"
               :class="{ 'miniatura-activa': fotoSeleccionada === index }"
+              :title="`Ver imagen ${index + 1}`"
               @click="fotoSeleccionada = index"
             >
               <img :src="foto" :alt="`Foto ${index + 1}`" class="miniatura-img" />
-              <span class="etiqueta-foto">{{ index === 0 ? 'Principal' : 'Puesta / Detalle' }}</span>
             </button>
           </div>
         </section>
