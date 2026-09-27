@@ -13,7 +13,6 @@ const CLIENTES_INICIALES = [
     tipo: 'Habitual',
     cantidadCompras: 8,
     ultimaVisita: '2026-09-20',
-    notas: 'Clienta de confianza, suele retirar los fines de semana.',
   },
   {
     id: 2,
@@ -24,7 +23,6 @@ const CLIENTES_INICIALES = [
     tipo: 'Nuevo',
     cantidadCompras: 1,
     ultimaVisita: '2026-09-25',
-    notas: 'Primera compra realizada por WhatsApp.',
   },
   {
     id: 3,
@@ -35,7 +33,6 @@ const CLIENTES_INICIALES = [
     tipo: 'Habitual',
     cantidadCompras: 5,
     ultimaVisita: '2026-09-22',
-    notas: 'Prefiere joyas en acero 316L plateado.',
   },
   {
     id: 4,
@@ -46,7 +43,6 @@ const CLIENTES_INICIALES = [
     tipo: 'Nuevo',
     cantidadCompras: 0,
     ultimaVisita: '2026-09-26',
-    notas: 'Consultó por aros y piercings en tienda física.',
   },
   {
     id: 5,
@@ -57,15 +53,23 @@ const CLIENTES_INICIALES = [
     tipo: 'Habitual',
     cantidadCompras: 12,
     ultimaVisita: '2026-09-18',
-    notas: 'Clienta habitual de confianza, retira pedidos directo de Central.',
   },
 ]
+
+export const calcularTipoCliente = (cantidadCompras) => {
+  return Number(cantidadCompras || 0) > 1 ? 'Habitual' : 'Nuevo'
+}
 
 export const useClientesStore = defineStore('clientes', () => {
   const cargarInicial = () => {
     try {
       const guardado = localStorage.getItem(CLAVE_CLIENTES)
-      return guardado ? JSON.parse(guardado) : CLIENTES_INICIALES
+      if (!guardado) return CLIENTES_INICIALES
+      const parsed = JSON.parse(guardado)
+      return parsed.map((c) => ({
+        ...c,
+        tipo: calcularTipoCliente(c.cantidadCompras),
+      }))
     } catch {
       return CLIENTES_INICIALES
     }
@@ -106,9 +110,8 @@ export const useClientesStore = defineStore('clientes', () => {
       contacto_telefono: nuevo.telefono ? nuevo.telefono.trim() : (nuevo.contacto_telefono ? nuevo.contacto_telefono.trim() : ''),
       ci: nuevo.ci ? nuevo.ci.trim() : '',
       cantidadCompras: compras,
-      tipo: nuevo.tipo || (compras > 1 ? 'Habitual' : 'Nuevo'),
+      tipo: calcularTipoCliente(compras),
       ultimaVisita: new Date().toISOString().slice(0, 10),
-      notas: nuevo.notas || '',
     }
     clientes.value.unshift(nuevoCliente)
     guardarEnStorage()
@@ -127,10 +130,8 @@ export const useClientesStore = defineStore('clientes', () => {
       if (datos.ci !== undefined) c.ci = datos.ci.trim()
       if (datos.cantidadCompras !== undefined) {
         c.cantidadCompras = Number(datos.cantidadCompras)
-        c.tipo = c.cantidadCompras > 1 ? 'Habitual' : 'Nuevo'
+        c.tipo = calcularTipoCliente(c.cantidadCompras)
       }
-      if (datos.tipo !== undefined) c.tipo = datos.tipo
-      if (datos.notas !== undefined) c.notas = datos.notas
       guardarEnStorage()
       return true
     }

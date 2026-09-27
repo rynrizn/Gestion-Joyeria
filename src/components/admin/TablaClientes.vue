@@ -31,11 +31,10 @@ defineEmits(['crear-reserva', 'contactar', 'ver-historial', 'editar'])
         </thead>
         <tbody>
           <tr v-for="c in clientes" :key="c.id">
-            <!-- 1. Nombre y notas -->
+            <!-- 1. Nombre -->
             <td>
               <div class="celda-nombre">
                 <span class="nombre-principal">{{ c.nombre }}</span>
-                <span v-if="c.notas" class="notas-cliente">{{ c.notas }}</span>
               </div>
             </td>
 
