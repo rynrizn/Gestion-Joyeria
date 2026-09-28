@@ -15,9 +15,6 @@ export const useAuthStore = defineStore('auth', () => {
       const guardado = localStorage.getItem(CLAVE_SESION)
       if (!guardado) return null
       const parsed = JSON.parse(guardado)
-      if (parsed && parsed.rol === 'ADMINISTRADORA' && (!parsed.nombre || parsed.nombre === 'Dueña del Negocio')) {
-        parsed.nombre = 'Belen'
-      }
       return parsed
     } catch {
       return null
@@ -59,107 +56,59 @@ export const useAuthStore = defineStore('auth', () => {
     return Math.max(0, MAX_INTENTOS - intentosFallidos.value)
   })
 
-  // Registros autorizados en Supabase (configuracion-supabase.txt)
-  const USUARIOS_VALIDOS = [
-    {
-      identificadores: ['belen', 'belen@moonstone.com', 'duena@moonstone.com', 'duena'],
-      password: 'admin1234',
-      datos: {
-        id: 1,
-        nombre: 'Belen',
-        username: 'belen',
-        email: 'duena@moonstone.com',
-        rol: 'ADMINISTRADORA',
-        id_rol: 1,
-        turno: 'Todos los Turnos',
-      },
-    },
-    {
-      identificadores: ['manana@moonstone.com', 'vendedoramanana', 'manana'],
-      password: 'mañana2026',
-      datos: {
-        id: 2,
-        nombre: 'Vendedora Mañana',
-        username: 'vendedoramanana',
-        email: 'manana@moonstone.com',
-        rol: 'PERSONAL_TIENDA',
-        id_rol: 2,
-        turno: 'Turno Mañana',
-      },
-    },
-    {
-      identificadores: ['tarde@moonstone.com', 'vendedoratarde', 'tarde'],
-      password: 'tarde2026',
-      datos: {
-        id: 3,
-        nombre: 'Vendedora Tarde',
-        username: 'vendedoratarde',
-        email: 'tarde@moonstone.com',
-        rol: 'PERSONAL_TIENDA',
-        id_rol: 2,
-        turno: 'Turno Tarde',
-      },
-    },
-  ]
+  // Determinar turno operativo según rol y datos del usuario
+  const deducirTurno = (nombreUsuario = '', nombre = '', rol = '') => {
+    if (rol === 'ADMINISTRADORA') return 'Todos los Turnos'
+    const texto = `${nombreUsuario} ${nombre}`.toLowerCase()
+    if (texto.includes('mañana') || texto.includes('manana')) return 'Turno Mañana'
+    if (texto.includes('tarde')) return 'Turno Tarde'
+    return 'Turno General'
+  }
+
+  // Registrar un intento fallido y aplicar bloqueo si corresponde
+  const registrarIntentoFallido = (mensajeError) => {
+    intentosFallidos.value += 1
+    localStorage.setItem(CLAVE_INTENTOS, String(intentosFallidos.value))
+
+    if (intentosFallidos.value >= MAX_INTENTOS) {
+      tiempoBloqueoHasta.value = Date.now() + TIEMPO_BLOQUEO_MS
+      localStorage.setItem(CLAVE_BLOQUEO, String(tiempoBloqueoHasta.value))
+      error.value = 'Has superado el límite de 5 intentos fallidos. El acceso ha sido bloqueado por 15 minutos por seguridad.'
+      return {
+        exito: false,
+        bloqueado: true,
+        mensaje: error.value,
+        minutosRestantes: 15,
+      }
+    }
+
+    const restantes = MAX_INTENTOS - intentosFallidos.value
+    error.value = mensajeError || `Credenciales incorrectas. Te queda${restantes > 1 ? 'n' : ''} ${restantes} intento${restantes > 1 ? 's' : ''} antes de bloquear temporalmente el acceso.`
+    return {
+      exito: false,
+      bloqueado: false,
+      mensaje: error.value,
+      intentosRestantes: restantes,
+    }
+  }
+
+  // Limpiar intentos tras un login exitoso
+  const limpiarIntentos = () => {
+    intentosFallidos.value = 0
+    tiempoBloqueoHasta.value = 0
+    localStorage.removeItem(CLAVE_INTENTOS)
+    localStorage.removeItem(CLAVE_BLOQUEO)
+  }
 
   /**
-   * ===========================================================================
-   * GUÍA DE INTEGRACIÓN CON SUPABASE AUTH (CÓDIGO COMENTADO)
-   * ===========================================================================
-   *
-   * 1. INICIAR SESIÓN REAL CON SUPABASE AUTH:
-   * const iniciarSesionSupabase = async (email, password) => {
-   *   cargando.value = true
-   *   error.value = ''
-   *   try {
-   *     // Autentica contra el servicio GoTrue de Supabase
-   *     const { data, error: errorAuth } = await supabase.auth.signInWithPassword({
-   *       email,
-   *       password,
-   *     })
-   *     if (errorAuth) throw errorAuth
-   *
-   *     // Consulta datos de rol en la tabla PostgreSQL 'usuario' vinculada al id
-   *     const { data: usuarioBD, error: errorUsuario } = await supabase
-   *       .from('usuario')
-   *       .select('id_usuario, nombre, id_rol, rol(nombre)')
-   *       .eq('id_usuario', data.user.id)
-   *       .single()
-   *     if (errorUsuario) throw errorUsuario
-   *
-   *     usuario.value = {
-   *       id: usuarioBD.id_usuario,
-   *       nombre: usuarioBD.nombre,
-   *       email: data.user.email,
-   *       rol: usuarioBD.rol?.nombre || 'PERSONAL_TIENDA',
-   *       turno: 'Turno Tarde',
-   *     }
-   *     localStorage.setItem(CLAVE_SESION, JSON.stringify(usuario.value))
-   *     return { exito: true }
-   *   } catch (err) {
-   *     error.value = err.message || 'Error al iniciar sesión en Supabase'
-   *     return { exito: false, mensaje: error.value }
-   *   } finally {
-   *     cargando.value = false
-   *   }
-   * }
-   *
-   * 2. RESTAURAR SESIÓN AL RECARGAR PÁGINA (main.js o App.vue):
-   * const verificarSesionActiva = async () => {
-   *   const { data: { session } } = await supabase.auth.getSession()
-   *   if (session) {
-   *     // Mantener usuario activo consultando su perfil
-   *   }
-   * }
-   * ===========================================================================
+   * Iniciar sesión real autenticando contra Supabase Auth (auth.users)
+   * y obteniendo el perfil y rol desde la base de datos (public.usuario + public.rol)
    */
-
-  // Iniciar sesión con validación de credenciales e intentos (Modo demo reactivo con protección contra fuerza bruta)
   const iniciarSesion = async (identificador, contrasena) => {
     cargando.value = true
     error.value = ''
 
-    // 1. Verificar si el usuario está bloqueado temporalmente
+    // 1. Verificar bloqueo por fuerza bruta
     if (estaBloqueado.value) {
       cargando.value = false
       const mins = minutosRestantesBloqueo.value
@@ -172,63 +121,161 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
-    const idLimpio = identificador.trim().toLowerCase()
+    const idLimpio = identificador.trim()
     const passLimpio = contrasena.trim()
 
-    // 2. Buscar coincidencia con las credenciales oficiales de Supabase
-    const usuarioEncontrado = USUARIOS_VALIDOS.find(
-      (u) => u.identificadores.includes(idLimpio) && u.password === passLimpio
-    )
+    try {
+      let emailAAutenticar = idLimpio.toLowerCase()
 
-    if (usuarioEncontrado) {
-      // Éxito: Guardar sesión y resetear intentos
-      usuario.value = { ...usuarioEncontrado.datos }
-      localStorage.setItem(CLAVE_SESION, JSON.stringify(usuario.value))
-      
-      // Limpiar contadores de intentos fallidos
-      intentosFallidos.value = 0
-      tiempoBloqueoHasta.value = 0
-      localStorage.removeItem(CLAVE_INTENTOS)
-      localStorage.removeItem(CLAVE_BLOQUEO)
+      // 2. Si no es un email directo, buscar el correo asociado al nombre de usuario en public.usuario
+      if (!emailAAutenticar.includes('@')) {
+        const { data: usuarioEncontrado } = await supabase
+          .from('usuario')
+          .select('correo, nombre_usuario')
+          .ilike('nombre_usuario', emailAAutenticar)
+          .maybeSingle()
 
-      cargando.value = false
-      return { exito: true }
-    } else {
-      // Fallo: Incrementar contador de intentos fallidos
-      intentosFallidos.value += 1
-      localStorage.setItem(CLAVE_INTENTOS, String(intentosFallidos.value))
-
-      if (intentosFallidos.value >= MAX_INTENTOS) {
-        // Bloquear por 15 minutos
-        tiempoBloqueoHasta.value = Date.now() + TIEMPO_BLOQUEO_MS
-        localStorage.setItem(CLAVE_BLOQUEO, String(tiempoBloqueoHasta.value))
-
-        error.value = `Has superado el límite de 5 intentos fallidos. El acceso ha sido bloqueado por 15 minutos por seguridad.`
-        cargando.value = false
-        return {
-          exito: false,
-          bloqueado: true,
-          mensaje: error.value,
-          minutosRestantes: 15,
+        if (usuarioEncontrado?.correo) {
+          emailAAutenticar = usuarioEncontrado.correo.toLowerCase()
+        } else {
+          // Soporte para alias frecuentes
+          if (emailAAutenticar === 'belen' || emailAAutenticar === 'duena') {
+            emailAAutenticar = 'belengg300@gmail.com'
+          } else if (emailAAutenticar === 'manana' || emailAAutenticar === 'vendedoramanana') {
+            emailAAutenticar = 'manana@moonstone.com'
+          } else if (emailAAutenticar === 'tarde' || emailAAutenticar === 'vendedoratarde') {
+            emailAAutenticar = 'tarde@moonstone.com'
+          }
         }
-      } else {
-        const restantes = MAX_INTENTOS - intentosFallidos.value
-        error.value = `Credenciales incorrectas. Te queda${restantes > 1 ? 'n' : ''} ${restantes} intento${restantes > 1 ? 's' : ''} antes de bloquear temporalmente el acceso.`
+      }
+
+      // 3. Autenticación contra Supabase Auth (auth.users)
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: emailAAutenticar,
+        password: passLimpio,
+      })
+
+      if (authError || !authData?.user) {
         cargando.value = false
+        return registrarIntentoFallido('Correo, usuario o contraseña incorrectos.')
+      }
+
+      const authUser = authData.user
+
+      // 4. Consultar perfil en public.usuario mediante auth_id o correo con su rol
+      let { data: perfilUsuario, error: errorPerfil } = await supabase
+        .from('usuario')
+        .select(`
+          id_usuario,
+          nombre,
+          nombre_usuario,
+          correo,
+          auth_id,
+          activo,
+          id_rol,
+          rol:id_rol (
+            id_rol,
+            nombre
+          )
+        `)
+        .eq('auth_id', authUser.id)
+        .maybeSingle()
+
+      // Respaldo: si por alguna razón no coincidiera auth_id exacto, buscar por correo
+      if (!perfilUsuario) {
+        const { data: perfilPorCorreo } = await supabase
+          .from('usuario')
+          .select(`
+            id_usuario,
+            nombre,
+            nombre_usuario,
+            correo,
+            auth_id,
+            activo,
+            id_rol,
+            rol:id_rol (
+              id_rol,
+              nombre
+            )
+          `)
+          .ilike('correo', authUser.email)
+          .maybeSingle()
+
+        if (perfilPorCorreo) {
+          perfilUsuario = perfilPorCorreo
+          // Sincronizar automáticamente el auth_id en la base de datos
+          try {
+            await supabase
+              .from('usuario')
+              .update({ auth_id: authUser.id })
+              .eq('id_usuario', perfilPorCorreo.id_usuario)
+          } catch (syncErr) {
+            console.warn('No se pudo actualizar auth_id en usuario:', syncErr)
+          }
+        }
+      }
+
+      // 5. Verificar si el usuario está activo en la tienda
+      if (perfilUsuario && perfilUsuario.activo === false) {
+        await supabase.auth.signOut()
+        cargando.value = false
+        error.value = 'Este usuario se encuentra inactivo. Consulta con la administradora.'
         return {
           exito: false,
           bloqueado: false,
           mensaje: error.value,
-          intentosRestantes: restantes,
         }
+      }
+
+      // 6. Determinar rol y estructura de datos para la aplicación
+      const rolNombre = perfilUsuario?.rol?.nombre || (perfilUsuario?.id_rol === 1 ? 'ADMINISTRADORA' : 'PERSONAL_TIENDA')
+      const turnoCalculado = deducirTurno(
+        perfilUsuario?.nombre_usuario || '',
+        perfilUsuario?.nombre || '',
+        rolNombre
+      )
+
+      const usuarioFinal = {
+        id: perfilUsuario?.id_usuario || 1,
+        id_usuario: perfilUsuario?.id_usuario || 1,
+        nombre: perfilUsuario?.nombre || (rolNombre === 'ADMINISTRADORA' ? 'Belen' : 'Personal de Tienda'),
+        username: perfilUsuario?.nombre_usuario || emailAAutenticar.split('@')[0],
+        email: authUser.email,
+        correo: authUser.email,
+        rol: rolNombre,
+        id_rol: perfilUsuario?.id_rol || (rolNombre === 'ADMINISTRADORA' ? 1 : 2),
+        turno: turnoCalculado,
+        auth_id: authUser.id,
+      }
+
+      // 7. Establecer sesión y persistencia
+      usuario.value = usuarioFinal
+      localStorage.setItem(CLAVE_SESION, JSON.stringify(usuarioFinal))
+      limpiarIntentos()
+
+      cargando.value = false
+      return { exito: true }
+    } catch (err) {
+      cargando.value = false
+      error.value = err.message || 'Error de conexión con el servicio de autenticación.'
+      return {
+        exito: false,
+        bloqueado: false,
+        mensaje: error.value,
+        intentosRestantes: Math.max(0, MAX_INTENTOS - intentosFallidos.value),
       }
     }
   }
 
-  // Cerrar sesión
-  const cerrarSesion = () => {
+  // Cerrar sesión tanto en el cliente local como en Supabase Auth
+  const cerrarSesion = async () => {
     usuario.value = null
     localStorage.removeItem(CLAVE_SESION)
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('Error al cerrar sesión en Supabase:', err)
+    }
   }
 
   return {
