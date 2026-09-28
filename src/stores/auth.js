@@ -127,24 +127,26 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       let emailAAutenticar = idLimpio.toLowerCase()
 
-      // 2. Si no es un email directo, buscar el correo asociado al nombre de usuario en public.usuario
+      // 2. Si no es un email directo, resolver el correo asociado desde la base de datos (public.usuario)
       if (!emailAAutenticar.includes('@')) {
         const { data: usuarioEncontrado } = await supabase
           .from('usuario')
-          .select('correo, nombre_usuario')
+          .select('correo')
           .ilike('nombre_usuario', emailAAutenticar)
           .maybeSingle()
 
         if (usuarioEncontrado?.correo) {
           emailAAutenticar = usuarioEncontrado.correo.toLowerCase()
         } else {
-          // Soporte para alias frecuentes
-          if (emailAAutenticar === 'belen' || emailAAutenticar === 'duena') {
-            emailAAutenticar = 'belengg300@gmail.com'
-          } else if (emailAAutenticar === 'manana' || emailAAutenticar === 'vendedoramanana') {
-            emailAAutenticar = 'manana@moonstone.com'
-          } else if (emailAAutenticar === 'tarde' || emailAAutenticar === 'vendedoratarde') {
-            emailAAutenticar = 'tarde@moonstone.com'
+          // Búsqueda flexible por nombre si el identificador no coincide directamente con nombre_usuario
+          const { data: usuarioPorNombre } = await supabase
+            .from('usuario')
+            .select('correo')
+            .ilike('nombre', `%${emailAAutenticar}%`)
+            .maybeSingle()
+
+          if (usuarioPorNombre?.correo) {
+            emailAAutenticar = usuarioPorNombre.correo.toLowerCase()
           }
         }
       }
