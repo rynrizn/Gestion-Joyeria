@@ -17,10 +17,10 @@ export const CONFIG_NEGOCIO = {
   
   // [ESPACIO CONFIGURABLE] Número de celular/WhatsApp oficial para recibir los pedidos
   // Código de país + número (ej. 59171234567 sin espacios ni signo + para la API de WhatsApp)
-  whatsappNumero: '59165800816',
+  whatsappNumero: '59164317072',
   
   // Formato visual para mostrar en la interfaz
-  whatsappDisplay: '+591 65800816',
+  whatsappDisplay: '+591 64317072',
 
   // Redes sociales o enlaces oficiales
   instagram: '@moonstone.bo',
